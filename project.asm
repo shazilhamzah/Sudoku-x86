@@ -1,8 +1,9 @@
 [org 0x0100]
 jmp main
 
-message: db " " ; string to be printed
-; message2: db 124
+horizontalLine: db 196 ; string to be printed
+verticalLine: db 124
+emptyString: db " "
 length: dw 1 ; length of the string
 numbers: db 1,2,3,4,5,6,7,8,9
 
@@ -74,43 +75,53 @@ blackBackgroundSubroutine:
 
 printColsSubroutine:
     mov cx, 3
-    printCols:
-        mov bx, 0
-    loopCol:
-        mov ax, cx
-        push ax                 ; push x position
-        mov ax, bx
-        push ax                 ; push y position
+printCols:
+    mov bx, 0
+loopCol:
+    mov ax, cx
+    push ax                 ; push x position
+    mov ax, bx
+    push ax                 ; push y position
 
-        ; Check if cx is 27 or 51 for blue attribute, else use yellow
-        cmp cx, 27
-        je blueAttribute         ; If cx is 27, set blue attribute
-        cmp cx, 51
-        je blueAttribute         ; If cx is 51, set blue attribute
+    ; Check if cx is 27 or 51 for blue attribute and empty string, else use yellow
+    cmp cx, 27
+    je handleBlueEmptyString    ; If cx is 27, jump to handle blue and empty string
+    cmp cx, 51
+    je handleBlueEmptyString    ; If cx is 51, jump to handle blue and empty string
 
-        ; Default case: use yellow attribute
-    yellowAttribute:
-        mov ax, 0x60             ; Yellow on black attribute
-        jmp pushAttribute        ; Jump to push the attribute
+    ; Default case: use yellow attribute and verticalLine
+yellowAttribute:
+    mov ax, 0x0E             ; Yellow on black attribute
+    jmp pushVerticalLine     ; Jump to push verticalLine
 
-    blueAttribute:
-        mov ax, 0x10             ; Blue on black attribute
+handleBlueEmptyString:
+    mov ax, 0x70             ; Blue on black attribute
+    push ax                  ; Push the attribute
 
-    pushAttribute:
-        push ax                 ; Push attribute
-        mov ax, message
-        push ax                 ; Push address of message
-        push word [length]       ; Push message length
-        call printstr            ; Call the printstr subroutine
+    ; Push emptyString
+    mov ax, emptyString      ; Address of emptyString
+    push ax                  ; Push the string address
+    push word [length]   ; Push the length of the empty string
+    call printstr            ; Call the printstr subroutine
+    jmp nextColumn           ; Jump to handle the next column
 
-        inc bx                  ; Increment y position
-        cmp bx, 25              ; Compare for the end of screen (25 rows)
-        jle loopCol             ; If not yet, loop back to print next row
+pushVerticalLine:
+    push ax                  ; Push the attribute
+    mov ax, verticalLine     ; Address of verticalLine
+    push ax                  ; Push the string address
+    push word [length]       ; Push the length of verticalLine
+    call printstr            ; Call the printstr subroutine
 
-        add cx, 8               ; Increment x position (next column block)
-        cmp cx, 81              ; Compare for the end of screen width (80 columns)
-        jle printCols           ; If not yet, loop back to print next column block
-        ret
+nextColumn:
+    inc bx                   ; Increment y position
+    cmp bx, 25               ; Compare for the end of screen (25 rows)
+    jle loopCol              ; If not yet, loop back to print next row
+
+    add cx, 8                ; Increment x position (next column block)
+    cmp cx, 81               ; Compare for the end of screen width (80 columns)
+    jle printCols            ; If not yet, loop back to print next column block
+    ret
+
 
 printRowsSubroutine:
     mov bx, 0               ; Start at row 0
@@ -130,16 +141,16 @@ printRowsSubroutine:
 
             ; Default case: use yellow attribute
         yellowAttribute1:
-            mov ax, 0x60            ; Yellow on black attribute
+            mov ax, 0x0E            ; Yellow on black attribute
             jmp pushAttribute1      ; Jump to push the attribute
 
         blueAttribute1:
-            mov ax, 0x10            ; Blue on black attribute
+            mov ax, 0x7F            ; Blue on black attribute
 
         pushAttribute1:
             push ax                 ; Push the attribute
             
-            mov ax, message         ; Load address of message
+            mov ax, horizontalLine         ; Load address of message
             push ax                 ; Push address of message
             push word [length]      ; Push message length
             call printstr           ; Call the printstr subroutine
@@ -160,7 +171,7 @@ printBorder:
         push ax ; push y position
         mov ax, 0x40 
         push ax ; push attribute
-        mov ax, message
+        mov ax, emptyString
         push ax ; push address of message
         push word [length] ; push message length
         call printstr ; call the printstr subroutine
@@ -176,7 +187,7 @@ printBorder:
         push ax ; push y position
         mov ax, 0x40
         push ax ; push attribute
-        mov ax, message
+        mov ax, emptyString
         push ax ; push address of message
         push word [length] ; push message length
         call printstr ; call the printstr subroutine
@@ -192,7 +203,7 @@ printBorder:
         push ax ; push y position
         mov ax, 0x40
         push ax ; push attribute
-        mov ax, message
+        mov ax, emptyString
         push ax ; push address of message
         push word [length] ; push message length
         call printstr ; call the printstr subroutine
@@ -208,7 +219,7 @@ printBorder:
         push ax ; push y position
         mov ax, 0x40
         push ax ; push attribute
-        mov ax, message
+        mov ax, emptyString
         push ax ; push address of message
         push word [length] ; push message length
         call printstr ; call the printstr subroutine
@@ -236,12 +247,12 @@ start:
     ; FILL SCREEN WITH A CHARACTER AND YELLOW BACKGROUND
     call blackBackgroundSubroutine
 
+    ; PRINTING ROWS
+    call printRowsSubroutine
+    
     ; PRINTING COLUMNS
     call printColsSubroutine
     
-    ; PRINTING ROWS
-    call printRowsSubroutine
-
     ; PRINTING BORDER
     call printBorder
 
