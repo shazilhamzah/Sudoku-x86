@@ -75,92 +75,101 @@ blackBackgroundSubroutine:
 
 printColsSubroutine:
     mov cx, 3
-printCols:
-    mov bx, 0
-loopCol:
-    mov ax, cx
-    push ax                 ; push x position
-    mov ax, bx
-    push ax                 ; push y position
+    printCols:
+        mov bx, 0
+    loopCol:
+        mov ax, cx
+        push ax                 ; push x position
+        mov ax, bx
+        push ax                 ; push y position
 
-    ; Check if cx is 27 or 51 for blue attribute and empty string, else use yellow
-    cmp cx, 27
-    je handleBlueEmptyString    ; If cx is 27, jump to handle blue and empty string
-    cmp cx, 51
-    je handleBlueEmptyString    ; If cx is 51, jump to handle blue and empty string
+        ; Check if cx is 27 or 51 for blue attribute and empty string, else use yellow
+        cmp cx, 27
+        je handleBlueEmptyString    ; If cx is 27, jump to handle blue and empty string
+        cmp cx, 51
+        je handleBlueEmptyString    ; If cx is 51, jump to handle blue and empty string
 
-    ; Default case: use yellow attribute and verticalLine
-yellowAttribute:
-    mov ax, 0x0E             ; Yellow on black attribute
-    jmp pushVerticalLine     ; Jump to push verticalLine
+        ; Default case: use yellow attribute and verticalLine
+    yellowAttribute:
+        mov ax, 0x0E             ; Yellow on black attribute
+        jmp pushVerticalLine     ; Jump to push verticalLine
 
-handleBlueEmptyString:
-    mov ax, 0x70             ; Blue on black attribute
-    push ax                  ; Push the attribute
+    handleBlueEmptyString:
+        mov ax, 0x70             ; Blue on black attribute
+        push ax                  ; Push the attribute
 
-    ; Push emptyString
-    mov ax, emptyString      ; Address of emptyString
-    push ax                  ; Push the string address
-    push word [length]   ; Push the length of the empty string
-    call printstr            ; Call the printstr subroutine
-    jmp nextColumn           ; Jump to handle the next column
+        ; Push emptyString
+        mov ax, emptyString      ; Address of emptyString
+        push ax                  ; Push the string address
+        push word [length]   ; Push the length of the empty string
+        call printstr            ; Call the printstr subroutine
+        jmp nextColumn           ; Jump to handle the next column
 
-pushVerticalLine:
-    push ax                  ; Push the attribute
-    mov ax, verticalLine     ; Address of verticalLine
-    push ax                  ; Push the string address
-    push word [length]       ; Push the length of verticalLine
-    call printstr            ; Call the printstr subroutine
+    pushVerticalLine:
+        push ax                  ; Push the attribute
+        mov ax, verticalLine     ; Address of verticalLine
+        push ax                  ; Push the string address
+        push word [length]       ; Push the length of verticalLine
+        call printstr            ; Call the printstr subroutine
 
-nextColumn:
-    inc bx                   ; Increment y position
-    cmp bx, 25               ; Compare for the end of screen (25 rows)
-    jle loopCol              ; If not yet, loop back to print next row
+    nextColumn:
+        inc bx                   ; Increment y position
+        cmp bx, 25               ; Compare for the end of screen (25 rows)
+        jle loopCol              ; If not yet, loop back to print next row
 
-    add cx, 8                ; Increment x position (next column block)
-    cmp cx, 81               ; Compare for the end of screen width (80 columns)
-    jle printCols            ; If not yet, loop back to print next column block
-    ret
-
+        add cx, 8                ; Increment x position (next column block)
+        cmp cx, 81               ; Compare for the end of screen width (80 columns)
+        jle printCols            ; If not yet, loop back to print next column block
+        ret
 
 printRowsSubroutine:
     mov bx, 0               ; Start at row 0
     printRows:
         mov cx, 3               ; Start at column 3
-        loopRow:
-            mov ax, cx
-            push ax                 ; Push x (column) position
-            mov ax, bx
-            push ax                 ; Push y (row) position
+    loopRow:
+        mov ax, cx
+        push ax                 ; Push x (column) position
+        mov ax, bx
+        push ax                 ; Push y (row) position
 
-            ; Check if bx is 9 or 18 for blue attribute
-            cmp bx, 9
-            je blueAttribute1       ; If bx is 9, set blue attribute
-            cmp bx, 18
-            je blueAttribute1       ; If bx is 18, set blue attribute
+        ; Check if bx is 9 or 18 for blue attribute and empty string
+        cmp bx, 9
+        je handleBlueEmptyString1  ; If bx is 9, jump to handle blue and empty string
+        cmp bx, 18
+        je handleBlueEmptyString1  ; If bx is 18, jump to handle blue and empty string
 
-            ; Default case: use yellow attribute
-        yellowAttribute1:
-            mov ax, 0x0E            ; Yellow on black attribute
-            jmp pushAttribute1      ; Jump to push the attribute
+        ; Default case: use yellow attribute and horizontalLine
+    yellowAttribute1:
+        mov ax, 0x0E            ; Yellow on black attribute
+        jmp pushHorizontalLine1 ; Jump to push horizontalLine
 
-        blueAttribute1:
-            mov ax, 0x7F            ; Blue on black attribute
+    handleBlueEmptyString1:
+        mov ax, 0x7F            ; Blue on black attribute
+        push ax                 ; Push the attribute
 
-        pushAttribute1:
-            push ax                 ; Push the attribute
-            
-            mov ax, horizontalLine         ; Load address of message
-            push ax                 ; Push address of message
-            push word [length]      ; Push message length
-            call printstr           ; Call the printstr subroutine
-            add cx, 1               ; Increment column position (cx)
-            cmp cx, 75              ; Compare for the end of row width (75 is arbitrary, set for spacing)
-            jle loopRow             ; If not yet, loop back
-            add bx, 3               ; Increment y position (next row)
-            cmp bx, 24              ; Compare for the end of screen (25 rows)
-            jle printRows           ; If not yet, loop back to print next row
-            ret
+        ; Push emptyString
+        mov ax, emptyString      ; Address of emptyString
+        push ax                 ; Push the string address
+        push word [length]  ; Push the length of the empty string
+        call printstr           ; Call the printstr subroutine
+        jmp nextRow             ; Jump to handle the next row
+
+    pushHorizontalLine1:
+        push ax                 ; Push the attribute
+        mov ax, horizontalLine  ; Address of horizontalLine
+        push ax                 ; Push the string address
+        push word [length]      ; Push the length of horizontalLine
+        call printstr           ; Call the printstr subroutine
+
+    nextRow:
+        add cx, 1               ; Increment column position (cx)
+        cmp cx, 75              ; Compare for the end of row width (75 is arbitrary, set for spacing)
+        jle loopRow             ; If not yet, loop back to print next column
+
+        add bx, 3               ; Increment y position (next row)
+        cmp bx, 24              ; Compare for the end of screen (25 rows)
+        jle printRows           ; If not yet, loop back to print next row
+        ret
 
 printBorder:
     mov cx,3
