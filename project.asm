@@ -1,29 +1,17 @@
 [org 0x0100]
-jmp main
+jmp start
+
+tone_divisors: dw 150
+message: db "Welcome to Sudoku", 0                  ; Null-terminated string
+continue_msg: db "Press any key to continue...", 0  ; Null-terminated string
+thanks_msg db "Thanks for playing...", 0           ; Null-terminated string
 
 horizontalLine: db 196 ; string to be printed
 verticalLine: db 124
 emptyString: db " "
 length: dw 1 ; length of the string
-numbers: db 1,2,3,4,5,6,7,8,9
+numbers: dw '1','2','3','4','5','6','7','8','9',0
 
-clrscr: 
-    push es
-    push ax
-    push di
-    mov ax, 0xb800
-    mov es, ax ; point es to video base
-    mov di, 0 ; point di to top left column
-
-nextloc: 
-    mov word [es:di], 0x0720 ; clear next char on screen
-    add di, 2 ; move to next screen location
-    cmp di, 4000 ; has the whole screen cleared
-    jne nextloc ; if no clear next position
-    pop di
-    pop ax
-    pop es
-    ret
 
 printstr: 
     push bp
@@ -235,10 +223,33 @@ printBorder:
         inc cx
         cmp cx,25
         jle colRight
-
     ret
 
 printNumbers:
+    mov cx,2        ; y pos
+    printOuterLoop:
+        mov bx,0    ; counter
+        mov dx,7    ; x pos
+        printInnerLoop:
+            mov ax, dx
+            push ax ; push x position
+            mov ax, cx
+            push ax ; push y position
+            mov ax, 0x0F
+            push ax ; push attribute
+            mov ax,0
+            mov si,numbers
+            add si,bx
+            push si ; push address of message
+            push word 2; push message length
+            call printstr ; call the printstr subroutine
+            add bx,2
+            add dx,8
+            cmp bx,18
+            jle printInnerLoop
+        add cx,3
+        cmp cx,29
+        jle printOuterLoop
     ret
 
 systemPauseSubroutine:
@@ -246,37 +257,278 @@ systemPauseSubroutine:
     int 16h
     ret
 
-start:
-    ; CLEARING SCREEN
+delay:
+    mov cx, 0xFFFF              
+    mov dx, 0xFFFF              
+    delay_loop:
+        loop delay_loop            
+        ret
+        
+        
+        
+    delay2:
+        mov cx, 0x04AA             
+        mov dx, 0xFFFF             
+    delay_loop2:
+        loop delay_loop2            
+        ret
+
+clrscr:
+    push es
+    push ax
+    push di 
+    mov ax, 0xb800
+    mov es, ax
+    mov di, 0
+
+nextloc:
+    mov word [es:di], 0x0720 
+    add di, 2
+    cmp di, 4000
+    jne nextloc
+
+    pop di
+    pop ax
+    pop es
+    ret
+		
+clrscrwithdelay:
+    push es
+    push ax
+    push di 
+    mov ax, 0xb800
+    mov es, ax
+    mov di, 0
+
+nextlocwithdelay:
+    mov word [es:di], 0x0720 
+    add di, 2
+
+	call delay2
+	
+    cmp di, 4000
+    jne nextlocwithdelay
+
+    pop di
+    pop ax
+    pop es
+    ret
+
+startingscreen:
+    
+    mov ax, 0B800h
+    mov es, ax 
+    mov di, 80 * 24 * 2         
+    mov cx, 160                 
+
+    fill_bottom_line:
+        mov al, '*'                 ; Character to display
+        mov ah, 0x0E              
+        stosw                       
+        loop fill_bottom_line
+
+        ; Fill the screen from bottom to top
+        mov cx, 24                ; 24 rows to fill (excluding the bottom row)
+        mov si, 80 * 24 * 2        ; Source offset for the bottom line
+        mov di, 80 * 23	* 2     ; Destination offset for the second-to-last line
+
+    fill_screen_upwards:                     
+        mov bx, 80                  ; 80 columns to copy
+
+copy_row:
+    ; Copy the row from the last filled row
+    mov ax, [es:si]             
+    mov [es:di], ax             
+    add si, 2                   
+    add di, 2                  
+    dec bx                      ; Decrement column count
+    jnz copy_row  
+	
+    ; Move up to the previous row
+    sub si, 160                 ; Move SI to the previous row 
+    sub di, 160    
+   
+   
+   call delay
+   call play_tone_sequence
+   sub di,160
+   cmp di,0
+   je endofrows
+   sub cx  ,1   
+   jnz fill_screen_upwards  ; Repeat for all rows above
+   ret
+   
+    endofrows:
+    ret
+
+play_tone_sequence:
+    mov cx,1
+        ; Load the next frequency divisor from the tone_divisors array
+    mov bx, cx           ; Copy cx to bx because we need to modify bx
+    shl bx, 1            ; Multiply bx by 2 (shifting left by 1 is equivalent to multiplying by 2)
+    sub bx, 2            ; Subtract 2 from bx (adjust for 0-based index)
+    mov ax, [tone_divisors + bx] ; Now access the array using the calculated index    
+
+call play_tone
+     ; Play the tone
+    dec cx                           ; Decrease tone count
+    jnz play_tone_sequence           ; If not zero, play next tone
+
+    ; Exit program (you'll need to replace this with an appropriate exit routine)
+    ret
+
+play_tone:
+    ; Set the PIT to mode 3 (square wave generation)
+    mov al, 0b10110110  ; Channel 2, mode 3, binary mode
+    out 0x43, al          ; Send the control word to the PIT
+
+    ; Send the divisor to the PIT for the current tone
+    mov al, al             ; Low byte of the divisor
+    out 0x42, al           ; Send low byte to the channel 2 data port (0x42)
+    mov al, ah             ; High byte of the divisor
+    out 0x42, al           ; Send high byte to the channel 2 data port (0x42)
+
+    ; Enable the PC speaker (turn it on)
+    in al, 0x61            ; Read port 0x61 (PC speaker control)
+    or al, 00000011b       ; Set bits 0 and 1 (enable speaker)
+    out 0x61, al           ; Write back to port 0x61
+   
+    ; Delay to hold the tone for a short while (this acts as the duration of the tone)
+    ;mov dx, 0FFFFh         ; Delay counter
+	ret
+
+  turnoffspeakers:
+    in al, 0x61            ; Read port 0x61
+    and al, 11111100b      ; Clear bits 0 and 1 (disable speaker)
+    out 0x61, al           ; Write back to port 0x61
+    ret  
+
+display_message_effect:
+    push es
+    push ax
+    push di
+
+    mov ax, 0xb800              
+    mov es, ax
+    mov si, message             ; Point SI to the message
+    mov cx, 18                  ; Length of mssg
+    mov di, (10 * 80 + 30) * 2  ; Moving two rows above the middle 
+
+print_next_char:
+    lodsb                       ; Load next character into AL
+    or al, al
+    jz done                     
+
+    mov ah, 0x0E               
+    mov [es:di], ax             
+    add di, 2                   ; Move to the next character position
+
+    call delay2_char   
+    call delay2_char  
+    call delay2_char   ; Small delay between characters
+    loop print_next_char        
+
+done:
+    pop di
+    pop ax
+    pop es
+    ret
+
+display_continue_msg:
+    push es
+    push ax
+    push di
+
+    mov ax, 0xb800              
+    mov es, ax
+    mov si, continue_msg        ; Point SI to the continue message
+    mov cx, 27                  ; Length of mssg
+    mov di, (12 * 80 + 28 - 2) * 2  
+
+print_continue_char:
+    lodsb                       ; Load next character into AL
+    or al, al
+    jz done_continue            ; If null terminator, we're done
+
+    mov ah, 0x0E                
+    mov [es:di], ax            
+    add di, 2                   ; Move to the next character position
+    call delay2_char
+    call delay2_char
+    call delay2_char
+    loop print_continue_char    
+
+    done_continue:
+        pop di
+        pop ax
+        pop es
+        ret
+
+    delay2_char:
+        mov cx, 0xFFFF
+        mov dx, 0xFFFF
+    delay_loop2_char:
+        loop delay_loop2_char
+        ret	
+	
+display_thanks_message_effect:
+    push es
+    push ax
+    push di
+
+    mov ax, 0xb800             
+    mov es, ax
+    mov si, thanks_msg          
+    mov cx, 20                  ; Length of mssg
+    mov di, (12 * 80 + 30) * 2  ; Position in the middle of the screen 
+
+    print_thanks_char:
+        lodsb                       
+        or al, al
+        jz done_thanks              
+        mov ah, 0x0E                
+        mov [es:di], ax             
+        add di, 2                  
+
+        call delay2_char            ; Small delay for the typing effect
+        call delay2_char
+        call delay2_char
+        loop print_thanks_char      
+
+    done_thanks:
+        pop di
+        pop ax
+        pop es
+        ret
+
+gameSubroutine:
+    ; WELCOME SCREEN
+    call clrscr             
+    call startingscreen    
+    call clrscrwithdelay
+	call turnoffspeakers
+	call display_message_effect  
+    call display_continue_msg 
+	call systemPauseSubroutine
+
+    ; GAME GRID
     call clrscr 
-
-    ; SETTING VIDEO MODE TO 03h (80x25 COLOR TEXT MODE)
     call settingVideoModeSubroutine
-
-    ; FILL SCREEN WITH A CHARACTER AND YELLOW BACKGROUND
     call blackBackgroundSubroutine
-
-    ; PRINTING ROWS
     call printRowsSubroutine
-    
-    ; PRINTING COLUMNS
     call printColsSubroutine
-    
-    ; PRINTING BORDER
     call printBorder
-
-    ; PRINT NUMBERS
     call printNumbers
-
-    ; SYSTEM PAUSE
     call systemPauseSubroutine
 
-    ; EXIT
+    ; END SCREEN
+    call clrscr
+	call display_thanks_message_effect
+
+start:
+    call gameSubroutine
     jmp end
 
-main:
-    jmp start
-
 end:
-    mov ax,0x4c00
-    int 0x21
+    mov ax, 0x4C00
+    int 21h
