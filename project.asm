@@ -1,18 +1,36 @@
 [org 0x0100]
 jmp start
 
+; WELCOME AND BYE PAGES PRINTING
 tone_divisors: dw 150
 message: db "Welcome to Sudoku", 0                  ; Null-terminated string
 continue_msg: db "Press any key to continue...", 0  ; Null-terminated string
 thanks_msg db "Thanks for playing...", 0           ; Null-terminated string
 
+; GRID - LINE PRINTING
 horizontalLine: db 196 ; string to be printed
 verticalLine: db 124
 emptyString: db " "
 length: dw 1 ; length of the string
+
+; GRID - NUMBERS PRINTING
 numbers: dw '1','2','3','4','5','6','7','8','9',0
+row1: dw '8','2','6','4',' ','9','5',' ',' ',0
+row2: dw '9',' ','5','2','6','7','8','4','3',0
+row3: dw '4','3','7','1','5',' ',' ','6','2',0
+row4: dw '6',' ','1','9','4','2','7',' ','8',0
+row5: dw '7','9','2','5',' ','3','6','1','4',0
+row6: dw '3','4',' ',' ','7','1','2','5','9',0
+row7: dw '1','6','4','8','9','5','3','2','7',0
+row8: dw '5','8','3','7','2',' ',' ','9','6',0
+row9: dw '2','7',' ','3','1','6',' ','8','5',0
+rowAddress: dw 0
+
+; SCORE SCREEN PRINTING
 time: dw 'Time: 00:00',0
 scoreString: dw 'Score: 0',0
+
+
 
 
 printstr: 
@@ -228,31 +246,34 @@ printBorder:
     ret
 
 printNumbers:
-    mov cx,2        ; y pos
+    mov ax, row1
+    mov [rowAddress], ax
+    mov cx, 2        ; y pos
     printOuterLoop:
-        mov bx,0    ; counter
-        mov dx,7    ; x pos
-        printInnerLoop:
-            mov ax, dx
-            push ax ; push x position
-            mov ax, cx
-            push ax ; push y position
-            mov ax, 0x0F
-            push ax ; push attribute
-            mov ax,0
-            mov si,numbers
-            add si,bx
-            push si ; push address of message
-            push word 2; push message length
-            call printstr ; call the printstr subroutine
-            add bx,2
-            add dx,8
-            cmp bx,18
-            jle printInnerLoop
-        add cx,3
-        cmp cx,29
+        mov bx, 0        ; counter
+        mov dx, 7        ; x pos
+    printInnerLoop:
+        mov ax, dx
+        push ax          ; push x position
+        mov ax, cx
+        push ax          ; push y position
+        mov ax, 0x0F
+        push ax          ; push attribute
+        mov si, [rowAddress]
+        add si, bx
+        push si          ; push address of message
+        push word 2      ; push message length
+        call printstr    ; call the printstr subroutine
+        add bx, 2
+        add dx, 8
+        cmp bx, 18
+        jle printInnerLoop
+
+        add cx, 3        ; Move to next row
+        add word [rowAddress], 20  ; Move to next row's data
+        cmp cx, 29
         jle printOuterLoop
-    ret
+        ret
 
 systemPauseSubroutine:
     mov ah,00h
@@ -391,7 +412,7 @@ play_tone_sequence:
     sub bx, 2            ; Subtract 2 from bx (adjust for 0-based index)
     mov ax, [tone_divisors + bx] ; Now access the array using the calculated index    
 
-call play_tone
+    call play_tone
      ; Play the tone
     dec cx                           ; Decrease tone count
     jnz play_tone_sequence           ; If not zero, play next tone
@@ -539,7 +560,7 @@ timerPrintSubroutine:
     mov al, 1 ; subservice 01 – update cursor
     mov bh, 1 ; output on page 0
     mov bl, 7 ; normal attrib
-    mov dx, 0x0B24 ; row 11 column 38
+    mov dx, 0x0B24 ; row 11 column 36
     mov cx, 11 ; length of string
     push cs
     pop es ; segment of string
@@ -559,7 +580,6 @@ scorePrintSubroutine:
     int 0x10 ; call BIOS video service
     call toPage1Subroutine
     ret
-
 
 gameSubroutine:
     ; WELCOME SCREEN
