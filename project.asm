@@ -11,6 +11,8 @@ verticalLine: db 124
 emptyString: db " "
 length: dw 1 ; length of the string
 numbers: dw '1','2','3','4','5','6','7','8','9',0
+time: dw 'Time: 00:00',0
+scoreString: dw 'Score: 0',0
 
 
 printstr: 
@@ -291,7 +293,27 @@ nextloc:
     pop ax
     pop es
     ret
-		
+
+clrscr_page1:
+    push es            ; Save ES register
+    push ax            ; Save AX register
+    push di            ; Save DI register
+
+    mov ax, 0xb800     ; Set segment to video memory
+    mov es, ax         ; ES = 0xB800 (video memory segment)
+    mov di, 0x1000     ; Start at offset 0x1000 (beginning of page 1)
+
+nextloc_page1:
+    mov word [es:di], 0x0720  ; Store space character (0x20) with attribute (0x07)
+    add di, 2                 ; Move to the next character position (2 bytes per character)
+    cmp di, 0x2000            ; 0x2000 = 4000 in hex, end of page 1 memory
+    jne nextloc_page1         ; If not done, keep clearing
+
+    pop di            ; Restore DI register
+    pop ax            ; Restore AX register
+    pop es            ; Restore ES register
+    ret               ; Return from the subroutine
+
 clrscrwithdelay:
     push es
     push ax
@@ -501,29 +523,74 @@ display_thanks_message_effect:
         pop es
         ret
 
+toPage0Subroutine:
+    mov ax,0500h
+    int 10h
+    ret
+
+toPage1Subroutine:
+    mov ax,0501h
+    int 10h
+    ret
+
+timerPrintSubroutine:
+    call clrscr_page1
+    mov ah, 0x13 ; service 13 - print string
+    mov al, 1 ; subservice 01 – update cursor
+    mov bh, 1 ; output on page 0
+    mov bl, 7 ; normal attrib
+    mov dx, 0x0B24 ; row 11 column 38
+    mov cx, 11 ; length of string
+    push cs
+    pop es ; segment of string
+    mov bp, time ; offset of string
+    int 0x10 ; call BIOS video service
+
+scorePrintSubroutine:
+    mov ah, 0x13 ; service 13 - print string
+    mov al, 1 ; subservice 01 – update cursor
+    mov bh, 1 ; output on page 0
+    mov bl, 7 ; normal attrib
+    mov dx, 0x0C26 ; row 12 column 38
+    mov cx, 8 ; length of string
+    push cs
+    pop es ; segment of string
+    mov bp, scoreString ; offset of string
+    int 0x10 ; call BIOS video service
+    call toPage1Subroutine
+    ret
+
+
 gameSubroutine:
     ; WELCOME SCREEN
-    call clrscr             
-    call startingscreen    
-    call clrscrwithdelay
-	call turnoffspeakers
-	call display_message_effect  
-    call display_continue_msg 
-	call systemPauseSubroutine
+    WELCOME:
+        call clrscr             
+        call startingscreen    
+        call clrscrwithdelay
+        call turnoffspeakers
+        call display_message_effect  
+        call display_continue_msg 
+        call systemPauseSubroutine
 
     ; GAME GRID
-    call clrscr 
-    call settingVideoModeSubroutine
-    call blackBackgroundSubroutine
-    call printRowsSubroutine
-    call printColsSubroutine
-    call printBorder
-    call printNumbers
-    call systemPauseSubroutine
+    GAMEGRID:
+        call clrscr 
+        call settingVideoModeSubroutine
+        call blackBackgroundSubroutine
+        call printRowsSubroutine
+        call printColsSubroutine
+        call printBorder
+        call printNumbers
+        call systemPauseSubroutine
+        call timerPrintSubroutine
+        call systemPauseSubroutine
+        call toPage0Subroutine
 
     ; END SCREEN
-    call clrscr
-	call display_thanks_message_effect
+    FINAL:
+        call clrscr
+        call display_thanks_message_effect
+        ret
 
 start:
     call gameSubroutine
