@@ -53,7 +53,7 @@ scoreString: dw 'Score: 0',0
 
 
 
-
+; GENERIC HELPING FUNCTIONS
 printstr: 
     push bp
     mov bp, sp
@@ -93,6 +93,107 @@ settingVideoModeSubroutine:
     int 10h
     ret
 
+clrscr:
+    push es
+    push ax
+    push di 
+    mov ax, 0xb800
+    mov es, ax
+    mov di, 0
+
+nextloc:
+    mov word [es:di], 0x0720 
+    add di, 2
+    cmp di, 4000
+    jne nextloc
+
+    pop di
+    pop ax
+    pop es
+    ret
+
+clrscr_page3:
+    push es            ; Save ES register
+    push ax            ; Save AX register
+    push di            ; Save DI register
+
+    mov ax, 0xb800     ; Set segment to video memory
+    mov es, ax         ; ES = 0xB800 (video memory segment)
+    mov di, 0x2000     ; Start at offset 0x1000 (beginning of page 1)
+
+nextloc_page3:
+    mov word [es:di], 0x0720  ; Store space character (0x20) with attribute (0x07)
+    add di, 2                 ; Move to the next character position (2 bytes per character)
+    cmp di, 0x2000            ; 0x2000 = 4000 in hex, end of page 1 memory
+    jne nextloc_page3         ; If not done, keep clearing
+
+    pop di            ; Restore DI register
+    pop ax            ; Restore AX register
+    pop es            ; Restore ES register
+    ret               ; Return from the subroutine
+
+clrscrwithdelay:
+    push es
+    push ax
+    push di 
+    mov ax, 0xb800
+    mov es, ax
+    mov di, 0
+
+nextlocwithdelay:
+    mov word [es:di], 0x0720 
+    add di, 2
+
+	call delay2
+	
+    cmp di, 4000
+    jne nextlocwithdelay
+
+    pop di
+    pop ax
+    pop es
+    ret
+
+delay:
+    mov cx, 0xFFFF              
+    mov dx, 0xFFFF              
+    delay_loop:
+        loop delay_loop            
+        ret
+        
+        
+        
+    delay2:
+        mov cx, 0x04AA             
+        mov dx, 0xFFFF             
+    delay_loop2:
+        loop delay_loop2            
+        ret
+
+toPage0Subroutine:
+    mov ax,0500h
+    int 10h
+    ret
+
+toPage1Subroutine:
+    mov ax,0501h
+    int 10h
+    ret
+    
+toPage2Subroutine:
+    mov ax,0502h
+    int 10h
+    ret
+
+toPage3Subroutine:
+    mov ax,0503h
+    int 10h
+    ret
+
+
+
+
+; PRINTING GRID AND NUMBERS
 blackBackgroundSubroutine:
     mov ah, 09h  ; BIOS function: Write character with attribute
     mov al, ' '  ; Space character
@@ -494,88 +595,47 @@ printNumbers:
         jle printOuterLoop
         ret
 
+printNumbersRemain:
+    mov ax, row7
+    mov [rowAddress], ax
+    mov cx, 2        ; y pos
+    printOuterLoopRemain:
+        mov bx, 0        ; counter
+        mov dx, 7        ; x pos
+    printInnerLoopRemain:
+        mov ax, dx
+        push ax          ; push x position
+        mov ax, cx
+        push ax          ; push y position
+        mov ax, 0x0F
+        push ax          ; push attribute
+        mov si, [rowAddress]
+        add si, bx
+        push si          ; push address of message
+        push word 2      ; push message length
+        mov ax, 0xbA00
+        mov es, ax ; point es to video base
+        call printstr    ; call the printstr subroutine
+        add bx, 2
+        add dx, 8
+        cmp bx, 18
+        jle printInnerLoopRemain
+
+        add cx, 4        ; Move to next row
+        add word [rowAddress], 20  ; Move to next row's data
+        cmp cx, 10
+        jle printOuterLoopRemain
+        ret
+
 askForInput:
     mov ah,00h
     int 16h
     ret
 
-delay:
-    mov cx, 0xFFFF              
-    mov dx, 0xFFFF              
-    delay_loop:
-        loop delay_loop            
-        ret
-        
-        
-        
-    delay2:
-        mov cx, 0x04AA             
-        mov dx, 0xFFFF             
-    delay_loop2:
-        loop delay_loop2            
-        ret
 
-clrscr:
-    push es
-    push ax
-    push di 
-    mov ax, 0xb800
-    mov es, ax
-    mov di, 0
 
-nextloc:
-    mov word [es:di], 0x0720 
-    add di, 2
-    cmp di, 4000
-    jne nextloc
 
-    pop di
-    pop ax
-    pop es
-    ret
-
-clrscr_page3:
-    push es            ; Save ES register
-    push ax            ; Save AX register
-    push di            ; Save DI register
-
-    mov ax, 0xb800     ; Set segment to video memory
-    mov es, ax         ; ES = 0xB800 (video memory segment)
-    mov di, 0x2000     ; Start at offset 0x1000 (beginning of page 1)
-
-nextloc_page3:
-    mov word [es:di], 0x0720  ; Store space character (0x20) with attribute (0x07)
-    add di, 2                 ; Move to the next character position (2 bytes per character)
-    cmp di, 0x2000            ; 0x2000 = 4000 in hex, end of page 1 memory
-    jne nextloc_page3         ; If not done, keep clearing
-
-    pop di            ; Restore DI register
-    pop ax            ; Restore AX register
-    pop es            ; Restore ES register
-    ret               ; Return from the subroutine
-
-clrscrwithdelay:
-    push es
-    push ax
-    push di 
-    mov ax, 0xb800
-    mov es, ax
-    mov di, 0
-
-nextlocwithdelay:
-    mov word [es:di], 0x0720 
-    add di, 2
-
-	call delay2
-	
-    cmp di, 4000
-    jne nextlocwithdelay
-
-    pop di
-    pop ax
-    pop es
-    ret
-
+; WELCOME AND ENDING SCREEN
 startingscreen:
     
     mov ax, 0B800h
@@ -763,26 +823,9 @@ display_thanks_message_effect:
         pop es
         ret
 
-toPage0Subroutine:
-    mov ax,0500h
-    int 10h
-    ret
 
-toPage1Subroutine:
-    mov ax,0501h
-    int 10h
-    ret
-    
-toPage2Subroutine:
-    mov ax,0502h
-    int 10h
-    ret
 
-toPage3Subroutine:
-    mov ax,0503h
-    int 10h
-    ret
-
+; SCORE AND TIMER PRINTING
 timerPrintSubroutine:
     call clrscr_page3
     mov ax,36
@@ -813,9 +856,13 @@ scorePrintSubroutine:
     mov ax,0xbb00
     mov es,ax
     call printstr
-    call toPage3Subroutine
+    call toPage3Subroutine  ; GOES TO TIMER AND SCORE PAGE
     ret
 
+
+
+
+; MAIN GAME FUNCTION
 gameSubroutine:
     ; WELCOME SCREEN
     WELCOME:
@@ -833,6 +880,7 @@ gameSubroutine:
         call settingVideoModeSubroutine
         call blackBackgroundSubroutine
 
+
     ; GRID PRINTING
     GAMEBOARD:
         call printRowsSubroutine
@@ -842,15 +890,16 @@ gameSubroutine:
         call printBorder
         call printBorderRemain
         call printNumbers
+        call printNumbersRemain
 
     ; MECHANICS
     MECHANICS:
         call askForInput
-        call toPage2Subroutine
+        call toPage2Subroutine  ; GOES TO THE REMAINING GRID PAGE
         call askForInput
         call timerPrintSubroutine
         call askForInput
-        call toPage0Subroutine
+        call toPage0Subroutine  ; GOES TO THE MAIN GRID PAGE
 
     ; END SCREEN
     FINAL:
