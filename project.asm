@@ -627,11 +627,6 @@ printNumbersRemain:
         jle printOuterLoopRemain
         ret
 
-askForInput:
-    mov ah,00h
-    int 16h
-    ret
-
 
 
 
@@ -825,9 +820,10 @@ display_thanks_message_effect:
 
 
 
+
 ; SCORE AND TIMER PRINTING
 timerPrintSubroutine:
-    call clrscr_page3
+    ; call clrscr_page3
     mov ax,36
     push ax
     mov ax,11
@@ -856,9 +852,65 @@ scorePrintSubroutine:
     mov ax,0xbb00
     mov es,ax
     call printstr
-    call toPage3Subroutine  ; GOES TO TIMER AND SCORE PAGE
     ret
 
+
+
+
+; INPUT HANDELING
+askForInput:
+    xor ax,ax
+    int 16h
+    
+    ; CHANGE PAGE KEYS
+    cmp ah, 0x4D    ; Right arrow key
+    je toRemainGrid
+    cmp ah, 0x4B    ; Left arrow key
+    je toMainGrid
+    cmp ah, 0x1F    ; S key
+    je toScorePage
+    cmp ah, 0x01    ; Escape key
+    je toEndGame
+
+    ; CURSOR KEYS
+    cmp ah, 0x48    ; Up arrow key
+    je moveCursorUp
+    cmp ah, 0x50    ; Down arrow key
+    je moveCursorDown
+    
+    jmp askForInputReturn
+
+    toMainGrid:
+        call toPage0Subroutine
+        jmp askForInputReturn
+
+    toRemainGrid:
+        call toPage2Subroutine
+        jmp askForInputReturn
+
+    toScorePage:
+        call toPage3Subroutine
+        jmp askForInputReturn
+
+    moveCursorUp:
+        call moveCursorUpSubroutine
+        jmp askForInputReturn
+
+    moveCursorDown:
+        call moveCursorDownSubroutine
+        jmp askForInputReturn
+
+    toEndGame:
+        call toPage0Subroutine
+        jmp FINAL
+
+    askForInputReturn:
+        ret
+
+moveCursorUpSubroutine:
+    ret
+
+moveCursorDownSubroutine:
 
 
 
@@ -891,21 +943,18 @@ gameSubroutine:
         call printBorderRemain
         call printNumbers
         call printNumbersRemain
+        call timerPrintSubroutine
 
     ; MECHANICS
     MECHANICS:
         call askForInput
-        call toPage2Subroutine  ; GOES TO THE REMAINING GRID PAGE
-        call askForInput
-        call timerPrintSubroutine
-        call askForInput
-        call toPage0Subroutine  ; GOES TO THE MAIN GRID PAGE
+        jmp MECHANICS
 
     ; END SCREEN
     FINAL:
         call clrscr
         call display_thanks_message_effect
-        ret
+        call end
 
 start:
     call gameSubroutine
