@@ -50,7 +50,10 @@ hrow9: dw ' ','7',' ','3','1',' ',' ','8','5',0
 rowAddress: dw 0
 difficulty: dw 0
 cursorRow: dw 0
+cursorRowRemain: dw 0
 cursorCol: dw 0
+cursorColRemain: dw 0
+currentPage: dw 0
 
 ; SCORE SCREEN PRINTING
 time: dw 'Time: 00:00',0
@@ -68,7 +71,7 @@ ms_per_cycle equ 55
 ; SOUND AND TIMER
 tapsound:
     ; Set up PIT for sound frequency
-    mov al, 0b10110110         ; Command byte for channel 2, mode 3 (square wave)
+    mov al, 010110110b         ; Command byte for channel 2, mode 3 (square wave)
     out 0x43, al
 
     mov ax, 1193182 / 600       ; Load frequency divisor for ~600 Hz (typewriter sound)
@@ -317,21 +320,25 @@ delay:
         ret
 
 toPage0Subroutine:
+    mov word [currentPage], 0
     mov ax,0500h
     int 10h
     ret
 
 toPage1Subroutine:
+    mov word [currentPage], 1
     mov ax,0501h
     int 10h
     ret
     
 toPage2Subroutine:
+    mov word [currentPage], 2
     mov ax,0502h
     int 10h
     ret
 
 toPage3Subroutine:
+    mov word [currentPage], 3
     mov ax,0503h
     int 10h
     ret
@@ -348,6 +355,32 @@ byte_to_ascii:
     add al, '0'                      ; Convert remainder (units) to ASCII
     ret
 
+makeSomethingUnblink:
+    push bp
+    mov bp, sp
+    push es
+    push ax
+    push cx
+    push si
+    push di
+    mov al, 80  ; load al with columns per row
+    mul byte [bp+10] ; multiply with y position
+    add ax, [bp+12] ; add x position
+    shl ax, 1 ; turn into byte offset
+    mov di,ax ; point di to required location
+    mov si, [bp+6] ; point si to string
+    mov cx, [bp+4] ; load length of string in cx
+    mov ax,[es:di]
+    and ah,01101111b
+    mov [es:di], ax
+    pop di
+    pop si
+    pop cx
+    pop ax
+    pop es
+    pop bp
+    ret 10 
+
 makeSomethingBlink:
     push bp
     mov bp, sp
@@ -363,19 +396,9 @@ makeSomethingBlink:
     mov di,ax ; point di to required location
     mov si, [bp+6] ; point si to string
     mov cx, [bp+4] ; load length of string in cx
-    mov ah, [bp+8] ; load attribute in ah
-    ; mov bx,0
-
-makeSomethingBlinkNext: 
     mov ax,[es:di]
-    or ah,10000000b; set blink bit
-    ; add ax,128h
-    mov [es:di], ax ; show this char on screen
-    ; mov [row1+bx],ax
-    ; mov al, [si] ; load next char of string
-    ; add di, 2 ; move to next screen location 
-    ; add si, 1 ; move to next char in string
-    ; loop makeSomethingBlinkNext ; repeat the operation cx times
+    or ah,10010000b
+    mov [es:di], ax
     pop di
     pop si
     pop cx
@@ -890,7 +913,7 @@ play_tone_sequence:
 
 play_tone:
     ; Set the PIT to mode 3 (square wave generation)
-    mov al, 0b10110110  ; Channel 2, mode 3, binary mode
+    mov al, 010110110b  ; Channel 2, mode 3, binary mode
     out 0x43, al          ; Send the control word to the PIT
 
     ; Send the divisor to the PIT for the current tone
@@ -1059,7 +1082,7 @@ scorePrintSubroutine:
 askForInput:
     xor ax,ax
     int 16h
-    
+
     ; CHANGE PAGE KEYS
     cmp ah, 0x4D    ; Right arrow key
     je toRemainGrid
@@ -1070,17 +1093,33 @@ askForInput:
     cmp ah, 0x01    ; Escape key
     je toEndGame
 
+    cmp byte [currentPage], 0
+    je mainGridMovement
+    cmp byte [currentPage], 2
+    je remainGridMovement
+
     ; CURSOR KEYS
-    cmp ah, 0x11    ; W key
-    je moveCursorUp
-    cmp ah, 0x1F    ; S key
-    je moveCursorDown
-    cmp ah, 0x1E    ; A key
-    je moveCursorRight
-    cmp ah, 0x20    ; D key
-    je moveCursorRight
-    
-    jmp askForInputReturn
+    mainGridMovement:
+        cmp ah, 0x11    ; W key
+        je moveCursorUp
+        cmp ah, 0x1F    ; S key
+        je moveCursorDown
+        cmp ah, 0x1E    ; A key
+        je moveCursorLeft
+        cmp ah, 0x20    ; D key
+        je moveCursorRight
+        jmp askForInputReturn
+
+    remainGridMovement:
+        cmp ah, 0x11    ; W key
+        je moveCursorUpRemain
+        cmp ah, 0x1F    ; S key
+        je moveCursorDownRemain
+        cmp ah, 0x1E    ; A key
+        je moveCursorLeftRemain
+        cmp ah, 0x20    ; D key
+        je moveCursorRightRemain
+        jmp askForInputReturn
 
     toMainGrid:
         call toPage0Subroutine
@@ -1109,25 +1148,37 @@ askForInput:
     moveCursorRight:
         call moveCursorRightSubroutine
         jmp askForInputReturn
+        
+    moveCursorUpRemain:
+        call moveCursorUpSubroutineRemain
+        jmp askForInputReturn
+
+    moveCursorDownRemain:
+        call moveCursorDownSubroutineRemain
+        jmp askForInputReturn
+
+    moveCursorLeftRemain:
+        call moveCursorLeftSubroutineRemain
+        jmp askForInputReturn
+
+    moveCursorRightRemain:
+        call moveCursorRightSubroutineRemain
+        jmp askForInputReturn
 
     toEndGame:
         call toPage0Subroutine
         jmp FINAL
 
     askForInputReturn:
-        ret
+        jmp askForInput
 
 moveCursorUpSubroutine:
-    ret
-    
-moveCursorDownSubroutine:
+    ; CALCULATING OLD ROW AND COL
     mov ax,[cursorRow]
-    cmp ax,7
-    jge moveCursorDownSubroutineReturn  ; Change jmp to jge (jump if greater or equal)
-    inc ax                              ; Increment instead of decrement for moving down
+    cmp ax,0
+    je moveCursorUpSubroutineReturn  ; Change jmp to jge (jump if greater or equal)
     mov [cursorRow],ax
-
-    ; CALCULATING ROW AND COL
+    
     xor ax,ax
     mov al,4
     mov bl,[cursorRow]
@@ -1142,10 +1193,108 @@ moveCursorDownSubroutine:
     add ax,7                ; Changed from sub to add, adjusted position
     mov dx,ax               ; col
 
-    ; PUSHING VALUES FOR BLINKING
+    mov ax,[cursorRow]
+    cmp ax,7
+    jge moveCursorUpSubroutineReturn  ; Change jmp to jge (jump if greater or equal)
+    dec ax                              ; Increment instead of decrement for moving down
+    mov [cursorRow],ax
+
     push dx                 ; x position
     push cx                 ; y position
-    mov ax,0x0F            ; attribute (white on black)
+    mov ax,0x0F             ; attribute (white on black)
+    push ax
+    mov ax,emptyString
+    push ax
+    push word [length]
+    mov ax,0xb800
+    mov es,ax
+    call makeSomethingUnblink
+
+    ; CALCULATING NEW ROW AND COL
+    xor ax,ax
+    mov al,4
+    mov bl,[cursorRow]
+    mul bl
+    add ax,2                ; Changed from sub to add to position correctly
+    mov cx,ax               ; row
+
+    xor ax,ax
+    mov al,8
+    mov bl,[cursorCol]
+    mul bl
+    add ax,7                ; Changed from sub to add, adjusted position
+    mov dx,ax               ; col
+
+    push dx                 ; x position
+    push cx                 ; y position
+    mov ax,0x0F             ; attribute (white on black)
+    push ax
+    mov ax,emptyString
+    push ax
+    push word [length]
+    mov ax,0xb800
+    mov es,ax
+    call makeSomethingBlink
+
+    moveCursorUpSubroutineReturn:
+        ret
+    
+moveCursorDownSubroutine:
+    ; CALCULATING OLD ROW AND COL
+    mov ax,[cursorRow]
+    cmp ax,5
+    jge moveCursorDownSubroutineReturn  ; Change jmp to jge (jump if greater or equal)
+    mov [cursorRow],ax
+    
+    xor ax,ax
+    mov al,4
+    mov bl,[cursorRow]
+    mul bl
+    add ax,2                ; Changed from sub to add to position correctly
+    mov cx,ax               ; row
+
+    xor ax,ax
+    mov al,8
+    mov bl,[cursorCol]
+    mul bl
+    add ax,7                ; Changed from sub to add, adjusted position
+    mov dx,ax               ; col
+
+    mov ax,[cursorRow]
+    cmp ax,7
+    jge moveCursorDownSubroutineReturn  ; Change jmp to jge (jump if greater or equal)
+    inc ax                              ; Increment instead of decrement for moving down
+    mov [cursorRow],ax
+
+    push dx                 ; x position
+    push cx                 ; y position
+    mov ax,0x0F             ; attribute (white on black)
+    push ax
+    mov ax,emptyString
+    push ax
+    push word [length]
+    mov ax,0xb800
+    mov es,ax
+    call makeSomethingUnblink
+
+    ; CALCULATING NEW ROW AND COL
+    xor ax,ax
+    mov al,4
+    mov bl,[cursorRow]
+    mul bl
+    add ax,2                ; Changed from sub to add to position correctly
+    mov cx,ax               ; row
+
+    xor ax,ax
+    mov al,8
+    mov bl,[cursorCol]
+    mul bl
+    add ax,7                ; Changed from sub to add, adjusted position
+    mov dx,ax               ; col
+
+    push dx                 ; x position
+    push cx                 ; y position
+    mov ax,0x0F             ; attribute (white on black)
     push ax
     mov ax,emptyString
     push ax
@@ -1158,22 +1307,418 @@ moveCursorDownSubroutine:
         ret
 
 moveCursorLeftSubroutine:
-    ret
+    ; CALCULATING OLD ROW AND COL
+    mov ax,[cursorCol]
+    cmp ax,0
+    je moveCursorLeftSubroutineReturn  ; Change jmp to jge (jump if greater or equal)
+    mov [cursorCol],ax
+    
+    xor ax,ax
+    mov al,4
+    mov bl,[cursorRow]
+    mul bl
+    add ax,2                ; Changed from sub to add to position correctly
+    mov cx,ax               ; row
+
+    xor ax,ax
+    mov al,8
+    mov bl,[cursorCol]
+    mul bl
+    add ax,7                ; Changed from sub to add, adjusted position
+    mov dx,ax               ; col
+
+    mov ax,[cursorCol]
+    cmp ax,0
+    je moveCursorLeftSubroutineReturn  ; Change jmp to jge (jump if greater or equal)
+    dec ax                      ; Increment instead of decrement for moving down
+    mov [cursorCol],ax
+
+    push dx                 ; x position
+    push cx                 ; y position
+    mov ax,0x0F             ; attribute (white on black)
+    push ax
+    mov ax,emptyString
+    push ax
+    push word [length]
+    mov ax,0xb800
+    mov es,ax
+    call makeSomethingUnblink
+
+    ; CALCULATING NEW ROW AND COL
+    xor ax,ax
+    mov al,4
+    mov bl,[cursorRow]
+    mul bl
+    add ax,2                ; Changed from sub to add to position correctly
+    mov cx,ax               ; row
+
+    xor ax,ax
+    mov al,8
+    mov bl,[cursorCol]
+    mul bl
+    add ax,7                ; Changed from sub to add, adjusted position
+    mov dx,ax               ; col
+
+    push dx                 ; x position
+    push cx                 ; y position
+    mov ax,0x0F             ; attribute (white on black)
+    push ax
+    mov ax,emptyString
+    push ax
+    push word [length]
+    mov ax,0xb800
+    mov es,ax
+    call makeSomethingBlink
+
+    moveCursorLeftSubroutineReturn:
+        ret
 
 moveCursorRightSubroutine:
-    ret
+    ; CALCULATING OLD ROW AND COL
+    mov ax,[cursorRow]
+    cmp ax,8
+    je moveCursorRightSubroutineReturn  ; Change jmp to jge (jump if greater or equal)
+    mov [cursorRow],ax
+    
+    xor ax,ax
+    mov al,4
+    mov bl,[cursorRow]
+    mul bl
+    add ax,2                ; Changed from sub to add to position correctly
+    mov cx,ax               ; row
+
+    xor ax,ax
+    mov al,8
+    mov bl,[cursorCol]
+    mul bl
+    add ax,7                ; Changed from sub to add, adjusted position
+    mov dx,ax               ; col
+
+    mov ax,[cursorCol]
+    cmp ax,8
+    jge moveCursorRightSubroutineReturn  ; Change jmp to jge (jump if greater or equal)
+    inc ax                              ; Increment instead of decrement for moving down
+    mov [cursorCol],ax
+
+    push dx                 ; x position
+    push cx                 ; y position
+    mov ax,0x0F             ; attribute (white on black)
+    push ax
+    mov ax,emptyString
+    push ax
+    push word [length]
+    mov ax,0xb800
+    mov es,ax
+    call makeSomethingUnblink
+
+    ; CALCULATING NEW ROW AND COL
+    xor ax,ax
+    mov al,4
+    mov bl,[cursorRow]
+    mul bl
+    add ax,2                ; Changed from sub to add to position correctly
+    mov cx,ax               ; row
+
+    xor ax,ax
+    mov al,8
+    mov bl,[cursorCol]
+    mul bl
+    add ax,7                ; Changed from sub to add, adjusted position
+    mov dx,ax               ; col
+
+    push dx                 ; x position
+    push cx                 ; y position
+    mov ax,0x0F             ; attribute (white on black)
+    push ax
+    mov ax,emptyString
+    push ax
+    push word [length]
+    mov ax,0xb800
+    mov es,ax
+    call makeSomethingBlink
+
+    moveCursorRightSubroutineReturn:
+        ret
+
+moveCursorUpSubroutineRemain:
+    ; CALCULATING OLD ROW AND COL
+    mov ax,[cursorRowRemain]
+    cmp ax,0
+    je moveCursorUpSubroutineReturnRemain  ; Change jmp to jge (jump if greater or equal)
+    mov [cursorRowRemain],ax
+    
+    xor ax,ax
+    mov al,4
+    mov bl,[cursorRowRemain]
+    mul bl
+    add ax,2                ; Changed from sub to add to position correctly
+    mov cx,ax               ; row
+
+    xor ax,ax
+    mov al,8
+    mov bl,[cursorColRemain]
+    mul bl
+    add ax,7                ; Changed from sub to add, adjusted position
+    mov dx,ax               ; col
+
+    mov ax,[cursorRowRemain]
+    cmp ax,7
+    jge moveCursorUpSubroutineReturnRemain  ; Change jmp to jge (jump if greater or equal)
+    dec ax                              ; Increment instead of decrement for moving down
+    mov [cursorRowRemain],ax
+
+    push dx                 ; x position
+    push cx                 ; y position
+    mov ax,0x0F             ; attribute (white on black)
+    push ax
+    mov ax,emptyString
+    push ax
+    push word [length]
+    mov ax,0xbA00
+    mov es,ax
+    call makeSomethingUnblink
+
+    ; CALCULATING NEW ROW AND COL
+    xor ax,ax
+    mov al,4
+    mov bl,[cursorRowRemain]
+    mul bl
+    add ax,2                ; Changed from sub to add to position correctly
+    mov cx,ax               ; row
+
+    xor ax,ax
+    mov al,8
+    mov bl,[cursorColRemain]
+    mul bl
+    add ax,7                ; Changed from sub to add, adjusted position
+    mov dx,ax               ; col
+
+    push dx                 ; x position
+    push cx                 ; y position
+    mov ax,0x0F             ; attribute (white on black)
+    push ax
+    mov ax,emptyString
+    push ax
+    push word [length]
+    mov ax,0xbA00
+    mov es,ax
+    call makeSomethingBlink
+
+    moveCursorUpSubroutineReturnRemain:
+        ret
+    
+moveCursorDownSubroutineRemain:
+    ; CALCULATING OLD ROW AND COL
+    mov ax,[cursorRowRemain]
+    cmp ax,2
+    jge moveCursorDownSubroutineReturnRemain  ; Change jmp to jge (jump if greater or equal)
+    mov [cursorRowRemain],ax
+    
+    xor ax,ax
+    mov al,4
+    mov bl,[cursorRowRemain]
+    mul bl
+    add ax,2                ; Changed from sub to add to position correctly
+    mov cx,ax               ; row
+
+    xor ax,ax
+    mov al,8
+    mov bl,[cursorColRemain]
+    mul bl
+    add ax,7                ; Changed from sub to add, adjusted position
+    mov dx,ax               ; col
+
+    mov ax,[cursorRowRemain]
+    cmp ax,2
+    jge moveCursorDownSubroutineReturnRemain  ; Change jmp to jge (jump if greater or equal)
+    inc ax                              ; Increment instead of decrement for moving down
+    mov [cursorRowRemain],ax
+
+    push dx                 ; x position
+    push cx                 ; y position
+    mov ax,0x0F             ; attribute (white on black)
+    push ax
+    mov ax,emptyString
+    push ax
+    push word [length]
+    mov ax,0xbA00
+    mov es,ax
+    call makeSomethingUnblink
+
+    ; CALCULATING NEW ROW AND COL
+    xor ax,ax
+    mov al,4
+    mov bl,[cursorRowRemain]
+    mul bl
+    add ax,2                ; Changed from sub to add to position correctly
+    mov cx,ax               ; row
+
+    xor ax,ax
+    mov al,8
+    mov bl,[cursorColRemain]
+    mul bl
+    add ax,7                ; Changed from sub to add, adjusted position
+    mov dx,ax               ; col
+
+    push dx                 ; x position
+    push cx                 ; y position
+    mov ax,0x0F             ; attribute (white on black)
+    push ax
+    mov ax,emptyString
+    push ax
+    push word [length]
+    mov ax,0xbA00
+    mov es,ax
+    call makeSomethingBlink
+
+    moveCursorDownSubroutineReturnRemain:
+        ret
+
+moveCursorLeftSubroutineRemain:
+    ; CALCULATING OLD ROW AND COL
+    mov ax,[cursorColRemain]
+    cmp ax,0
+    je moveCursorLeftSubroutineReturnRemain  ; Change jmp to jge (jump if greater or equal)
+    mov [cursorColRemain],ax
+    
+    xor ax,ax
+    mov al,4
+    mov bl,[cursorRowRemain]
+    mul bl
+    add ax,2                ; Changed from sub to add to position correctly
+    mov cx,ax               ; row
+
+    xor ax,ax
+    mov al,8
+    mov bl,[cursorColRemain]
+    mul bl
+    add ax,7                ; Changed from sub to add, adjusted position
+    mov dx,ax               ; col
+
+    mov ax,[cursorColRemain]
+    cmp ax,0
+    je moveCursorLeftSubroutineReturnRemain  ; Change jmp to jge (jump if greater or equal)
+    dec ax                      ; Increment instead of decrement for moving down
+    mov [cursorColRemain],ax
+
+    push dx                 ; x position
+    push cx                 ; y position
+    mov ax,0x0F             ; attribute (white on black)
+    push ax
+    mov ax,emptyString
+    push ax
+    push word [length]
+    mov ax,0xbA00
+    mov es,ax
+    call makeSomethingUnblink
+
+    ; CALCULATING NEW ROW AND COL
+    xor ax,ax
+    mov al,4
+    mov bl,[cursorRowRemain]
+    mul bl
+    add ax,2                ; Changed from sub to add to position correctly
+    mov cx,ax               ; row
+
+    xor ax,ax
+    mov al,8
+    mov bl,[cursorColRemain]
+    mul bl
+    add ax,7                ; Changed from sub to add, adjusted position
+    mov dx,ax               ; col
+
+    push dx                 ; x position
+    push cx                 ; y position
+    mov ax,0x0F             ; attribute (white on black)
+    push ax
+    mov ax,emptyString
+    push ax
+    push word [length]
+    mov ax,0xbA00
+    mov es,ax
+    call makeSomethingBlink
+
+    moveCursorLeftSubroutineReturnRemain:
+        ret
+
+moveCursorRightSubroutineRemain:
+    ; CALCULATING OLD ROW AND COL
+    mov ax,[cursorColRemain]
+    cmp ax,8
+    je moveCursorRightSubroutineReturnRemain  ; Change jmp to jge (jump if greater or equal)
+    mov [cursorCol],ax
+    
+    xor ax,ax
+    mov al,4
+    mov bl,[cursorRowRemain]
+    mul bl
+    add ax,2                ; Changed from sub to add to position correctly
+    mov cx,ax               ; row
+
+    xor ax,ax
+    mov al,8
+    mov bl,[cursorColRemain]
+    mul bl
+    add ax,7                ; Changed from sub to add, adjusted position
+    mov dx,ax               ; col
+
+    mov ax,[cursorColRemain]
+    cmp ax,8
+    jge moveCursorRightSubroutineReturnRemain  ; Change jmp to jge (jump if greater or equal)
+    inc ax                              ; Increment instead of decrement for moving down
+    mov [cursorColRemain],ax
+
+    push dx                 ; x position
+    push cx                 ; y position
+    mov ax,0x0F             ; attribute (white on black)
+    push ax
+    mov ax,emptyString
+    push ax
+    push word [length]
+    mov ax,0xbA00
+    mov es,ax
+    call makeSomethingUnblink
+
+    ; CALCULATING NEW ROW AND COL
+    xor ax,ax
+    mov al,4
+    mov bl,[cursorRowRemain]
+    mul bl
+    add ax,2                ; Changed from sub to add to position correctly
+    mov cx,ax               ; row
+
+    xor ax,ax
+    mov al,8
+    mov bl,[cursorColRemain]
+    mul bl
+    add ax,7                ; Changed from sub to add, adjusted position
+    mov dx,ax               ; col
+
+    push dx                 ; x position
+    push cx                 ; y position
+    mov ax,0x0F             ; attribute (white on black)
+    push ax
+    mov ax,emptyString
+    push ax
+    push word [length]
+    mov ax,0xbA00
+    mov es,ax
+    call makeSomethingBlink
+
+    moveCursorRightSubroutineReturnRemain:
+        ret
 
 
 ; MAIN GAME FUNCTION
 gameSubroutine:
     ; WELCOME SCREEN
     WELCOME:
-        ; call clrscr
-        ; call startingscreen 
+        ; call clrscr             
+        ; call startingscreen    
         ; call clrscrwithdelay
         ; call turnoffspeakers
-        ; call display_message_effect
-        ; call display_continue_msg
+        ; call display_message_effect  
+        ; call display_continue_msg 
         ; call askForInput
 
     ; GAME CONFIGURATIONS
