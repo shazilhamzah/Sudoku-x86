@@ -3,9 +3,9 @@ jmp start
 
 ; WELCOME AND BYE PAGES PRINTING
 tone_divisors: dw 150
-message: db "Welcome to Sudoku", 0                  ; Null-terminated string
-continue_msg: db "Press any key to continue...", 0  ; Null-terminated string
-thanks_msg db "Thanks for playing...", 0           ; Null-terminated string
+message: db "Welcome to Sudoku", 0              
+continue_msg: db "Press any key to continue...", 0
+thanks_msg db "Thanks for playing...", 0
 
 ; GRID - LINE PRINTING
 horizontalLine: db 196 ; string to be printed
@@ -45,11 +45,157 @@ hrow7: dw ' ','6',' ',' ','9','5','3','2',' ',0
 hrow8: dw '5','8',' ',' ','2',' ',' ','9','6',0
 hrow9: dw ' ','7',' ','3','1',' ',' ','8','5',0
 
+
+; GAME PLAYING VARIABLES
 rowAddress: dw 0
 difficulty: dw 0
+cursorRow: dw 0
+cursorCol: dw 0
+
 ; SCORE SCREEN PRINTING
 time: dw 'Time: 00:00',0
 scoreString: dw 'Score: 0',0
+gamestate: db 1
+hrs: dw 0
+min: dw 0
+sec: dw 0
+ms:  dw 0
+ticks: dw 0
+lastUpdateTime: dw 0
+ms_per_cycle equ 55 
+
+
+; SOUND AND TIMER
+tapsound:
+    ; Set up PIT for sound frequency
+    mov al, 0b10110110         ; Command byte for channel 2, mode 3 (square wave)
+    out 0x43, al
+
+    mov ax, 1193182 / 600       ; Load frequency divisor for ~600 Hz (typewriter sound)
+    out 0x42, al                ; Send lower byte of divisor to PIT channel 2
+    mov al, ah
+    out 0x42, al                ; Send upper byte of divisor
+
+    ; Enable PC speaker
+    in al, 0x61
+    or al, 00000011b            ; Set bits 0 and 1 to turn on speaker
+    out 0x61, al
+
+    ; Short delay to sustain the sound
+    mov cx, 1000
+
+delayloop:
+    loop delayloop
+
+    ; Disable PC speaker
+    in al, 0x61
+    and al, 11111100b           ; Clear bits 0 and 1 to turn off speaker
+    out 0x61, al
+    ret 
+
+skip_timer_update:
+    ; Restore registers and return from interrupt
+    mov al, 0x20
+    out 0x20, al
+    pop di
+    pop bx
+    pop ax
+    iret
+
+timerHook:
+    mov ax, 0
+    mov es, ax
+
+    ; Initialize time variables
+    mov word [sec], 0
+    mov word [min], 0
+    mov word [hrs], 0
+    mov word [ticks], 0
+    mov word [lastUpdateTime], 0
+
+    ; Hook the timer interrupt
+    cli                             ; Disable interrupts
+    mov word [es:8 * 4], onTimer    ; Set ISR address at vector 8
+    mov [es:8 * 4 + 2], cs
+    sti                             ; Enable interrupts
+    ret
+    
+onTimer:
+    push ax
+    push bx
+    push di
+	
+	
+    add word [ticks], 1            ; Increment ticks
+    add word [ms], ms_per_cycle    ; Add 55 ms to total milliseconds
+    cmp word [ms], 1000            ; Check if 1000 ms (1 second) passed
+    jl skip_sec                    ; If less than 1000 ms, continue
+
+    mov word [ms], 0               ; Reset ms counter
+    inc word [sec]                 ; Increment seconds
+    cmp word [sec], 60
+    jl skip_min
+
+    mov word [sec], 0              ; Reset seconds
+    inc word [min]                 ; Increment minutes
+    cmp word [min], 60
+    jl skip_hour
+
+    mov word [min], 0              ; Reset minutes
+    inc word [hrs]                 ; Increment hour
+   
+skip_hour:
+    ;;
+
+skip_min:
+    ;;
+
+skip_sec:
+
+	call update_time_string
+    ; Check game state
+    cmp byte [gamestate], 1          ; 1 = In-game
+    jne skip_timer_update            ; Skip timer updates if not in-game
+	;je updation
+   
+    mov ax,36
+    push ax
+    mov ax,11
+    push ax
+    mov ax,7
+    push ax
+    mov ax,time
+    push ax
+    mov ax,11
+    push ax
+    mov ax,0xbb00
+    mov es,ax
+    call printstr
+
+    ; Restore registers and end interrupt
+    mov al, 0x20                   ; End of interrupt command
+    out 0x20, al                   ; Send EOI to the PIC
+	pop di
+    pop bx
+    pop ax
+
+    iret                           ; Return from interrupt
+
+    
+ update_time_string:
+    ; Update seconds in time
+    mov al, byte [sec]
+    call byte_to_ascii
+    mov [time + 9], ah        ; Tens place of seconds
+    mov [time + 10], al       ; Units place of seconds
+
+    ; Update minutes in time
+    mov al, byte [min]
+    call byte_to_ascii
+    mov [time + 6], ah        ; Tens place of minutes
+    mov [time + 7], al        ; Units place of minutes
+    ret
+
 
 
 
@@ -189,6 +335,54 @@ toPage3Subroutine:
     mov ax,0503h
     int 10h
     ret
+
+byte_to_ascii:
+    ;-------------------------------------------------------------------------------
+    ; Converts a byte (0-99) in AL to two ASCII digits in AL and AH
+    ;-------------------------------------------------------------------------------    
+    mov ah, 0                        ; Clear AH for division
+    mov bl, 10                       ; Divisor for decimal conversion
+    div bl                           ; Divide AL by 10
+    add al, '0'                      ; Convert quotient (tens) to ASCII
+    xchg al, ah                      ; Move tens to AH
+    add al, '0'                      ; Convert remainder (units) to ASCII
+    ret
+
+makeSomethingBlink:
+    push bp
+    mov bp, sp
+    push es
+    push ax
+    push cx
+    push si
+    push di
+    mov al, 80  ; load al with columns per row
+    mul byte [bp+10] ; multiply with y position
+    add ax, [bp+12] ; add x position
+    shl ax, 1 ; turn into byte offset
+    mov di,ax ; point di to required location
+    mov si, [bp+6] ; point si to string
+    mov cx, [bp+4] ; load length of string in cx
+    mov ah, [bp+8] ; load attribute in ah
+    ; mov bx,0
+
+makeSomethingBlinkNext: 
+    mov ax,[es:di]
+    or ah,10000000b; set blink bit
+    ; add ax,128h
+    mov [es:di], ax ; show this char on screen
+    ; mov [row1+bx],ax
+    ; mov al, [si] ; load next char of string
+    ; add di, 2 ; move to next screen location 
+    ; add si, 1 ; move to next char in string
+    ; loop makeSomethingBlinkNext ; repeat the operation cx times
+    pop di
+    pop si
+    pop cx
+    pop ax
+    pop es
+    pop bp
+    ret 10 
 
 
 
@@ -639,7 +833,7 @@ startingscreen:
     mov cx, 160                 
 
     fill_bottom_line:
-        mov al, '*'                 ; Character to display
+        mov al, 0xDB                 ; Character to display
         mov ah, 0x0E              
         stosw                       
         loop fill_bottom_line
@@ -741,6 +935,7 @@ print_next_char:
     add di, 2                   ; Move to the next character position
 
     call delay2_char   
+	call tapsound
     call delay2_char  
     call delay2_char   ; Small delay between characters
     loop print_next_char        
@@ -771,6 +966,7 @@ print_continue_char:
     mov [es:di], ax            
     add di, 2                   ; Move to the next character position
     call delay2_char
+	call tapsound
     call delay2_char
     call delay2_char
     loop print_continue_char    
@@ -792,7 +988,8 @@ display_thanks_message_effect:
     push es
     push ax
     push di
-
+    mov byte [gamestate],0
+	
     mov ax, 0xb800             
     mov es, ax
     mov si, thanks_msg          
@@ -808,6 +1005,7 @@ display_thanks_message_effect:
         add di, 2                  
 
         call delay2_char            ; Small delay for the typing effect
+		call tapsound
         call delay2_char
         call delay2_char
         loop print_thanks_char      
@@ -867,16 +1065,20 @@ askForInput:
     je toRemainGrid
     cmp ah, 0x4B    ; Left arrow key
     je toMainGrid
-    cmp ah, 0x1F    ; S key
+    cmp ah, 0x0F    ; Tab key
     je toScorePage
     cmp ah, 0x01    ; Escape key
     je toEndGame
 
     ; CURSOR KEYS
-    cmp ah, 0x48    ; Up arrow key
+    cmp ah, 0x11    ; W key
     je moveCursorUp
-    cmp ah, 0x50    ; Down arrow key
+    cmp ah, 0x1F    ; S key
     je moveCursorDown
+    cmp ah, 0x1E    ; A key
+    je moveCursorRight
+    cmp ah, 0x20    ; D key
+    je moveCursorRight
     
     jmp askForInputReturn
 
@@ -900,6 +1102,14 @@ askForInput:
         call moveCursorDownSubroutine
         jmp askForInputReturn
 
+    moveCursorLeft:
+        call moveCursorLeftSubroutine
+        jmp askForInputReturn
+
+    moveCursorRight:
+        call moveCursorRightSubroutine
+        jmp askForInputReturn
+
     toEndGame:
         call toPage0Subroutine
         jmp FINAL
@@ -909,32 +1119,75 @@ askForInput:
 
 moveCursorUpSubroutine:
     ret
-
+    
 moveCursorDownSubroutine:
+    mov ax,[cursorRow]
+    cmp ax,7
+    jge moveCursorDownSubroutineReturn  ; Change jmp to jge (jump if greater or equal)
+    inc ax                              ; Increment instead of decrement for moving down
+    mov [cursorRow],ax
 
+    ; CALCULATING ROW AND COL
+    xor ax,ax
+    mov al,4
+    mov bl,[cursorRow]
+    mul bl
+    add ax,2                ; Changed from sub to add to position correctly
+    mov cx,ax               ; row
+
+    xor ax,ax
+    mov al,8
+    mov bl,[cursorCol]
+    mul bl
+    add ax,7                ; Changed from sub to add, adjusted position
+    mov dx,ax               ; col
+
+    ; PUSHING VALUES FOR BLINKING
+    push dx                 ; x position
+    push cx                 ; y position
+    mov ax,0x0F            ; attribute (white on black)
+    push ax
+    mov ax,emptyString
+    push ax
+    push word [length]
+    mov ax,0xb800
+    mov es,ax
+    call makeSomethingBlink
+
+    moveCursorDownSubroutineReturn:
+        ret
+
+moveCursorLeftSubroutine:
+    ret
+
+moveCursorRightSubroutine:
+    ret
 
 
 ; MAIN GAME FUNCTION
 gameSubroutine:
     ; WELCOME SCREEN
     WELCOME:
-        call clrscr             
-        call startingscreen    
-        call clrscrwithdelay
-        call turnoffspeakers
-        call display_message_effect  
-        call display_continue_msg 
-        call askForInput
+        ; call clrscr
+        ; call startingscreen 
+        ; call clrscrwithdelay
+        ; call turnoffspeakers
+        ; call display_message_effect
+        ; call display_continue_msg
+        ; call askForInput
 
     ; GAME CONFIGURATIONS
     SETTINGS:
         call clrscr 
         call settingVideoModeSubroutine
         call blackBackgroundSubroutine
+        call clrscr_page3
+        call timerHook
 
 
     ; GRID PRINTING
     GAMEBOARD:
+        call clrscr_page3
         call printRowsSubroutine
         call printRowsSubroutineRemain
         call printColsSubroutine
@@ -943,12 +1196,11 @@ gameSubroutine:
         call printBorderRemain
         call printNumbers
         call printNumbersRemain
-        call timerPrintSubroutine
 
     ; MECHANICS
     MECHANICS:
         call askForInput
-        jmp MECHANICS
+        jmp GAMEBOARD
 
     ; END SCREEN
     FINAL:
