@@ -1,27 +1,15 @@
 [org 0x0100]
 jmp start
 
-; WELCOME AND BYE PAGES PRINTING
-tone_divisors: dw 150
-message: db "Welcome to Sudoku", 0              
-continue_msg: db "Press any key to continue...", 0
-thanks_msg db "Thanks for playing...", 0
-
-; GRID - LINE PRINTING
-horizontalLine: db 196 ; string to be printed
-verticalLine: db 124
-emptyString: db " "
-length: dw 1 ; length of the string
-
 ; GRID - NUMBERS PRINTING
 numbers: dw '1','2','3','4','5','6','7','8','9',0
-row1: dw '8','2','6','4',' ','9','5',' ',' ',0
+row1: dw '8',' ','6','4',' ','9','5',' ',' ',0
 row2: dw '9',' ','5','2','6','7','8','4','3',0
 row3: dw '4','3','7','1','5',' ',' ','6','2',0
 row4: dw '6',' ','1','9','4','2','7',' ','8',0
-row5: dw '7','9','2','5',' ','3','6','1','4',0
+row5: dw '7','9','2','5',' ','3','6',' ','4',0
 row6: dw '3','4',' ',' ','7','1','2','5','9',0
-row7: dw '1','6','4','8','9','5','3','2','7',0
+row7: dw ' ','6','4',' ',' ','5','3','2','7',0
 row8: dw '5','8','3','7','2',' ',' ','9','6',0
 row9: dw '2','7',' ','3','1','6',' ','8','5',0
 
@@ -54,6 +42,19 @@ cursorRowRemain: dw 0
 cursorCol: dw 0
 cursorColRemain: dw 0
 currentPage: dw 0
+isValid: dw 0
+
+; GRID - LINE PRINTING
+horizontalLine: db 196 ; string to be printed
+verticalLine: db 124
+emptyString: db " "
+length: dw 1 ; length of the string
+
+; WELCOME AND BYE PAGES PRINTING
+tone_divisors: dw 150
+message: db "Welcome to Sudoku", 0              
+continue_msg: db "Press any key to continue...", 0
+thanks_msg db "Thanks for playing...", 0
 
 ; SCORE SCREEN PRINTING
 time: dw 'Time: 00:00',0
@@ -68,7 +69,197 @@ lastUpdateTime: dw 0
 ms_per_cycle equ 55 
 
 
+
 ; SOUND AND TIMER
+;//////////////////////////////////////////////this function will play the sound incase correct input///////////////////////
+correct_input:
+    pusha
+    call play_correct_input_sound   ;//////////////idk may be thori lambi ho but it can be adjusted ///// can also be played for row completion
+    popa
+    ret
+    ;this will play for row and completion it will have like a 1 sec delay in the game
+    ;we can directly use this or have a warapper
+
+play_on_rowncol_completion:
+    ; Set up PIT channel 2 in mode 3 (square wave)
+    mov al, 0xB6          ; Set PIT to mode 3 (square wave)
+    out 0x43, al          ; Send control byte to port 0x43
+
+    ; First note: C4 (261 Hz)
+    mov ax, 4776          ; Divider for ~261 Hz
+    call set_frequency
+    call delay1          
+    call delay1           
+    call delay1           
+    call delay1           
+    call delay1           
+    call delay1          
+
+    ; Second note: D4 (294 Hz)
+    mov ax, 4286          ; Divider for ~294 Hz
+    call set_frequency
+    call delay1
+    call delay1
+	call delay1          
+    call delay1           
+    call delay1           
+    call delay1           
+    call delay1           
+    call delay1           
+
+
+    ; Third note: E4 (329 Hz)
+    mov ax, 3654          ; Divider for ~329 Hz
+    call set_frequency
+    call delay1
+    call delay1
+    call delay1           
+    call delay1           
+
+    ; Fourth note: C4 (261 Hz)
+    mov ax, 4776          ; Divider for ~261 Hz
+    call set_frequency
+    call delay1
+    call delay1
+    call delay1           
+    call delay1           
+
+    ; Fifth note: G4 (392 Hz)
+    mov ax, 3412          ; Divider for ~392 Hz
+    call set_frequency
+    call delay1
+    call delay1
+    call delay1           
+    call delay1           
+
+    ; Sixth note: E4 (329 Hz)
+    mov ax, 3654          ; Divider for ~329 Hz
+    call set_frequency
+    call delay1
+    call delay1
+    call delay1           
+    call delay1           
+
+    ; Seventh note: C4 (261 Hz)
+    mov ax, 4776          ; Divider for ~261 Hz
+    call set_frequency
+    call delay1
+    call delay1
+    call delay1          
+    call delay1           
+
+    ; Eighth note: D4 (294 Hz)
+    mov ax, 4286          ; Divider for ~294 Hz
+    call set_frequency
+    call delay1
+    call delay1
+    call delay1           
+    call delay1           
+
+    in al, 0x61         
+    and al, 0xFC         
+    out 0x61, al        
+
+    ret
+	
+	;we will just need to call this function when we have a incorrect INPUT
+
+play_incorrect_input_sound:
+    ; Set up PIT channel 2 in mode 3 (square wave)
+    mov al, 0xB6          ; Set PIT to mode 3 (square wave)
+    out 0x43, al          ; Send control byte to port 0x43
+
+    ; First note: A3 (220 Hz)
+    mov ax, 5454          ; Divider for ~220 Hz
+    call set_frequency
+    call delay1
+    call delay1
+
+    ; Second note: G3 (196 Hz)
+    mov ax, 5734          ; Divider for ~196 Hz
+    call set_frequency
+    call delay1
+    call delay1
+
+    ; Third note: F3 (174 Hz)
+    mov ax, 6550          ; Divider for ~174 Hz
+    call set_frequency
+    call delay1
+    call delay1
+    
+    ; Fourth note: E3 (164 Hz)
+    mov ax, 6826          ; Divider for ~164 Hz
+    call set_frequency
+    call delay1
+    call delay1
+    
+    ; Fifth note: D3 (146 Hz)
+    mov ax, 7519          ; Divider for ~146 Hz
+    call set_frequency
+    call delay1
+    call delay1
+    
+    ; Stop sound
+    in al, 0x61         
+    and al, 0xFC         ; Turn off the speaker
+    out 0x61, al         
+
+    ret	
+
+delay1:
+	pusha
+	mov cx,0xFFFF
+	;mov dx,0xF000
+	loop2:
+	;dec dx
+		dec cx
+		jnz loop2
+	popa
+	ret
+
+set_frequency:
+    ; Sends frequency to PIT channel 2
+    out 0x42, al
+    mov al, ah            
+    out 0x42, al          
+
+    in al, 0x61           
+    or al, 0x03         
+    out 0x61, al          
+
+    ret
+
+play_correct_input_sound:
+    ; Set up PIT channel 2 in mode 3 (square wave)
+    mov al, 0xB6          
+    out 0x43, al        
+
+    ; High pitch tone (~800 Hz)
+    mov ax, 1428          ; Divider for ~800 Hz
+    call set_frequency
+    call delay1
+    call delay1
+
+    ; Medium pitch tone (~400 Hz)
+    mov ax, 2387          ; Divider for ~400 Hz
+    call set_frequency
+    call delay1
+    call delay1
+
+    ; Low pitch tone (~200 Hz)
+    mov ax, 4773          ; Divider for ~200 Hz
+    call set_frequency
+    call delay1
+    call delay1
+
+    
+    in al, 0x61          
+    or al, 0x03          
+    out 0x61, al        
+
+
+    ret
+
 tapsound:
     ; Set up PIT for sound frequency
     mov al, 010110110b         ; Command byte for channel 2, mode 3 (square wave)
@@ -406,6 +597,162 @@ makeSomethingBlink:
     pop es
     pop bp
     ret 10 
+
+; check_sudoku:
+    ;     push si            ; Save registers
+    ;     push di
+    ;     push cx
+    ;     push dx
+    ;     push ax
+    ;     push bx
+
+    ;     ; Clear isValid to 0 by default
+    ;     mov word [isValid], 0
+
+    ;     ; Row Check
+    ;     ; Row Check
+        ; mov ax, bx        ; Copy bx (row index) into ax
+        ; shl ax, 1          ; Multiply bx by 2 (each row entry is 2 bytes, so we shift left by 1)
+        ; lea si, [rows + ax] ; Compute the address of the row and store it in si
+        ; mov cx, 9          ; Set cx to 9, representing the number of columns in the row
+        ;             ; Iterate over 9 columns
+
+    ;     row_check_loop:
+    ;         mov dl, byte [si]      ; Get the current cell value
+    ;         cmp dl, al             ; Compare with the number to check
+    ;         je sudoku_invalid      ; If found in the row, invalid
+    ;         add si, 2              ; Move to the next cell in the row
+    ;         loop row_check_loop    ; Continue checking the row
+
+    ;         ; Column Check
+    ;         mov di, bx             ; Save row index in di for column tracking
+    ;         mov cx, 9              ; Iterate over 9 rows
+    ;         mov si, [rows]         ; Start with the first row
+    ;     col_check_loop:
+    ;         mov dl, byte [si + bh * 2] ; Get the value in the column for the current row
+    ;         cmp dl, al             ; Compare with the number to check
+    ;         je sudoku_invalid      ; If found in the column, invalid
+    ;         add si, 18             ; Move to the same column in the next row (9 cells * 2 bytes)
+    ;         loop col_check_loop    ; Continue checking the column
+
+    ;         ; Box Check
+    ;         ; Calculate box start row and column
+    ;         mov cl, bl             ; Copy row index
+    ;         xor dx, dx             ; Clear DX
+    ;         div byte [3]           ; Divide by 3 to get box start row index in AX
+    ;         mul byte [3]           ; Multiply by 3 to get actual start row index
+    ;         mov si, ax             ; Box start row in SI
+    ;         mov cl, bh             ; Copy column index
+    ;         div byte [3]           ; Divide by 3 to get box start column index
+    ;         mul byte [3]           ; Multiply by 3 to get actual start column index
+    ;         mov di, ax             ; Box start column in DI
+
+    ;         ; Check the 3x3 box
+    ;         mov cx, 3              ; Outer loop for rows in the box
+    ;     box_row_loop:
+    ;         push cx                ; Save row loop counter
+    ;         mov cx, 3              ; Inner loop for columns in the box
+    ;         mov si, rows         ; Load the base address of the rows array
+    ;         mov bx, bx           ; Ensure `bx` contains the row index
+    ;         shl bx, 1            ; Multiply the row index by 2 (each address is 2 bytes)
+    ;         add si, bx           ; Add the offset to `si` to get the address of the desired row
+
+    ;     box_col_loop:
+    ;         mov dl, byte [si]    ; Get the value at the address (initially set to `si`)
+    ;         add si, di           ; Manually calculate `di * 2` by adding `di` twice
+    ;         add si, di
+
+    ;         cmp dl, al             ; Compare with the number to check
+    ;         je sudoku_invalid      ; If found in the box, invalid
+    ;         add di, 1              ; Move to the next column in the box
+    ;         loop box_col_loop      ; Continue checking the box row
+    ;         pop cx                 ; Restore row loop counter
+    ;         add si, 1              ; Move to the next row in the box
+    ;         loop box_row_loop      ; Continue checking the box
+
+    ;         ; If all checks pass, the number is valid
+    ;         mov word [isValid], 1
+    ;         jmp sudoku_done
+
+    ;     sudoku_invalid:
+    ;         ; If any check fails, mark as invalid
+    ;         mov word [isValid], 0
+
+    ;     sudoku_done:
+    ;         ; Restore registers
+    ;         pop bx
+    ;         pop ax
+    ;         pop dx
+    ;         pop cx
+    ;         pop di
+    ;         pop si
+    ;         ret
+
+; checkSudoku:
+;     ; AX => Number to check
+;     ; BX => COL NUMBER
+;     ; DX => ROW NUMBER
+    
+
+;     mov word [isValid],0
+
+;     checkCols:
+;         mov si,[row1]
+;         mov cx, 9
+;         add si,bx
+;         checkCol:
+;             cmp ax, [si]
+;             je returnCheckSudoku
+;             add si, 20
+;             loop checkCol
+
+;     mov word [isValid],1
+
+
+;     returnCheckSudoku: 
+;         ret
+
+checkSudoku:
+    ; AX => Number to check
+    ; BX => COL NUMBER
+    ; DX => ROW NUMBER
+    ; DI => PAGE NUMBER
+    push ax
+    push bx
+    push cx
+    push dx
+    push si
+    push di
+    mov word [isValid], 0         ; Assume invalid until proven otherwise
+
+    ; Check if the number already exists in the column (excluding the current row)
+    mov si, row1                ; Start with the first row (row1)
+    mov cx, 9                     ; Loop through 9 rows
+    shl bx, 1                     ; Multiply column number by 2 (since each element is a word)
+    add si, bx                    ; Move to the column in row1
+    shr bx, 1                     ; Restore column index after the shift
+
+    checkCol:
+        cmp ax, [si]                  ; Compare input with the value in this cell
+        je skipCheck                  ; If it matches, skip this cell (we're modifying it)
+        add si, 20                    ; Move to the next row in the column (each row is 20 bytes)
+        loop checkCol                 ; Continue looping through rows
+
+        ; If we reach here, it means the number is valid in the column
+
+    checkRow:   
+
+
+    
+    mov word [isValid], 1         ; Mark the number as valid
+    skipCheck:
+        pop di
+        pop si
+        pop dx
+        pop cx
+        pop bx
+        pop ax
+        ret
 
 
 
@@ -885,6 +1232,9 @@ copy_row:
    
    call delay
    call play_tone_sequence
+    ;    call play_correct_input_sound
+    ;    call play_incorrect_input_sound
+    ;    call play_on_rowncol_completion
    sub di,160
    cmp di,0
    je endofrows
@@ -1093,10 +1443,92 @@ askForInput:
     cmp ah, 0x01    ; Escape key
     je toEndGame
 
+    ; SETTING si TO THE SPECIFIED ROW
+
+    tempNext1:
+        cmp byte [currentPage], 0
+        je saveSIPage0
+        cmp byte [currentPage], 2
+        je saveSIPage2
+
+    ; SAVING si FOR MAIN GRID
+    saveSIPage0:
+        cmp byte [cursorRow],0
+        je saveRow1
+        cmp byte [cursorRow],1
+        je saveRow2
+        cmp byte [cursorRow],2
+        je saveRow3
+        cmp byte [cursorRow],3
+        je saveRow4
+        cmp byte [cursorRow],4
+        je saveRow5
+        cmp byte [cursorRow],5
+        je saveRow6
+
+    ; SAVING si FOR REMAINING GRID
+    saveSIPage2:
+        cmp byte [cursorRowRemain],0
+        je saveRow7
+        cmp byte [cursorRowRemain],1
+        je saveRow8
+        cmp byte [cursorRowRemain],2
+        je saveRow9
+
+    tempNext:
     cmp byte [currentPage], 0
-    je mainGridMovement
+    je gotoSimpleInput
     cmp byte [currentPage], 2
-    je remainGridMovement
+    je gotoRemainInput
+    jmp inputCheckDone    ; Skip input checks if not on valid page
+
+    gotoSimpleInput:
+        cmp ah,0x02     ; '1' Key
+        je toInput1
+        cmp ah,0x03     ; '2' Key
+        je toInput2
+        cmp ah,0x04     ; '3' Key
+        je toInput3
+        cmp ah,0x05     ; '4' Key
+        je toInput4
+        cmp ah,0x06     ; '5' Key
+        je toInput5
+        cmp ah,0x07     ; '6' Key
+        je toInput6
+        cmp ah,0x08     ; '7' Key    
+        je toInput7
+        cmp ah,0x09     ; '8' Key
+        je toInput8
+        cmp ah,0x0A     ; '9' Key
+        je toInput9
+        jmp inputCheckDone    ; Continue to movement checks if no number pressed
+
+    gotoRemainInput:
+        cmp ah,0x02     ; '1' Key
+        je toInput1Remain
+        cmp ah,0x03     ; '2' Key
+        je toInput2Remain
+        cmp ah,0x04     ; '3' Key
+        je toInput3Remain
+        cmp ah,0x05     ; '4' Key
+        je toInput4Remain
+        cmp ah,0x06     ; '5' Key
+        je toInput5Remain
+        cmp ah,0x07     ; '6' Key
+        je toInput6Remain
+        cmp ah,0x08     ; '7' Key    
+        je toInput7Remain
+        cmp ah,0x09     ; '8' Key
+        je toInput8Remain
+        cmp ah,0x0A     ; '9' Key
+        je toInput9Remain
+        jmp inputCheckDone
+
+    inputCheckDone:     ; New label to continue with movement checks
+        cmp byte [currentPage], 0
+        je mainGridMovement
+        cmp byte [currentPage], 2
+        je remainGridMovement
 
     ; CURSOR KEYS
     mainGridMovement:
@@ -1164,6 +1596,429 @@ askForInput:
     moveCursorRightRemain:
         call moveCursorRightSubroutineRemain
         jmp askForInputReturn
+    
+    ; toInput1:
+    ;     mov bx,[cursorCol]
+    ;     shl bx,1
+    ;     cmp word [si+bx],' '  ; Check if current position contains a space
+    ;     jne short_ret         ; If not a space, return without inputting
+    ;     mov ax,'1'
+    ;     mov bx,[cursorCol]
+    ;     mov dx,[cursorRow]
+    ;     call checkSudoku
+    ;     cmp word [isValid],0
+    ;     je short_ret
+    ;     mov word [si+bx],'1'
+    ;     ret
+
+    toInput1:
+        mov bx, [cursorCol]         ; Get the column index
+        shl bx,1
+        cmp word [si + bx], ' '      ; Check if the current position contains a space
+        jne short_ret                ; If not a space, return without inputting
+
+        mov ax, '1'                  ; Prepare input '1'
+        mov bx, [cursorCol]          ; Get column index again (no need for shl bx, 1 here)
+        mov dx, [cursorRow]          ; Get the row index
+        call checkSudoku             ; Check if it's a valid move
+        cmp word [isValid], 1        ; Check if the move is valid (1 means valid)
+        je placeInput1                ; If valid, place the input
+        ret
+
+        placeInput1:
+            shl bx,1
+            mov word [si + bx], '1'
+            ret
+    
+
+
+
+
+    toInput2:
+        mov bx, [cursorCol]         ; Get the column index
+        shl bx,1
+        cmp word [si + bx], ' '      ; Check if the current position contains a space
+        jne short_ret                ; If not a space, return without inputting
+
+        mov ax, '2'                  ; Prepare input '1'
+        mov bx, [cursorCol]          ; Get column index again (no need for shl bx, 1 here)
+        mov dx, [cursorRow]          ; Get the row index
+        call checkSudoku             ; Check if it's a valid move
+
+        cmp word [isValid], 1        ; Check if the move is valid (1 means valid)
+        je placeInput2               ; If valid, place the input
+        ret
+
+        placeInput2:
+            shl bx,1
+            mov word [si + bx], '2'
+            ret
+
+    toInput3:
+        mov bx, [cursorCol]         ; Get the column index
+        shl bx,1
+        cmp word [si + bx], ' '      ; Check if the current position contains a space
+        jne short_ret                ; If not a space, return without inputting
+
+        mov ax, '3'                  ; Prepare input '3'
+        mov bx, [cursorCol]          ; Get column index again (no need for shl bx, 1 here)
+        mov dx, [cursorRow]          ; Get the row index
+        call checkSudoku             ; Check if it's a valid move
+
+        cmp word [isValid], 1        ; Check if the move is valid (1 means valid)
+        je placeInput3              ; If valid, place the input
+        ret
+
+        placeInput3:
+            shl bx,1
+            mov word [si + bx], '3'
+            ret
+
+    toInput4:
+        ; mov bx,[cursorCol]
+        ; shl bx,1
+        ; cmp word [si+bx],' '  ; Check if current position contains a space
+        ; jne short_ret         ; If not a space, return without inputting
+        ; mov word [si+bx],'4'
+        ; ret
+        mov bx, [cursorCol]         ; Get the column index
+        shl bx,1
+        cmp word [si + bx], ' '      ; Check if the current position contains a space
+        jne short_ret                ; If not a space, return without inputting
+
+        mov ax, '4'                  ; Prepare input '4'
+        mov bx, [cursorCol]          ; Get column index again (no need for shl bx, 1 here)
+        mov dx, [cursorRow]          ; Get the row index
+        call checkSudoku             ; Check if it's a valid move
+
+        cmp word [isValid], 1        ; Check if the move is valid (1 means valid)
+        je placeInput4               ; If valid, place the input
+        ret
+
+        placeInput4:
+            shl bx,1
+            mov word [si + bx], '4'
+            ret
+
+    toInput5:
+        mov bx, [cursorCol]         ; Get the column index
+        shl bx,1
+        cmp word [si + bx], ' '      ; Check if the current position contains a space
+        jne short_ret                ; If not a space, return without inputting
+
+        mov ax, '5'                  ; Prepare input '5'
+        mov bx, [cursorCol]          ; Get column index again (no need for shl bx, 1 here)
+        mov dx, [cursorRow]          ; Get the row index
+        call checkSudoku             ; Check if it's a valid move
+
+        cmp word [isValid], 1        ; Check if the move is valid (1 means valid)
+        je placeInput5              ; If valid, place the input
+        ret
+
+        placeInput5:
+            shl bx,1
+            mov word [si + bx], '5'
+            ret
+
+    toInput6:
+        mov bx, [cursorCol]         ; Get the column index
+        shl bx,1
+        cmp word [si + bx], ' '      ; Check if the current position contains a space
+        jne short_ret                ; If not a space, return without inputting
+
+        mov ax, '6'                  ; Prepare input '6'
+        mov bx, [cursorCol]          ; Get column index again (no need for shl bx, 1 here)
+        mov dx, [cursorRow]          ; Get the row index
+        call checkSudoku             ; Check if it's a valid move
+
+        cmp word [isValid], 1        ; Check if the move is valid (1 means valid)
+        je placeInput6               ; If valid, place the input
+        ret
+
+        placeInput6:
+            shl bx,1
+            mov word [si + bx], '6'
+            ret
+
+    toInput7:
+        mov bx, [cursorCol]         ; Get the column index
+        shl bx,1
+        cmp word [si + bx], ' '      ; Check if the current position contains a space
+        jne short_ret                ; If not a space, return without inputting
+
+        mov ax, '7'                  ; Prepare input '7'
+        mov bx, [cursorCol]          ; Get column index again (no need for shl bx, 1 here)
+        mov dx, [cursorRow]          ; Get the row index
+        call checkSudoku             ; Check if it's a valid move
+
+        cmp word [isValid], 1        ; Check if the move is valid (1 means valid)
+        je placeInput7               ; If valid, place the input
+        ret
+
+        placeInput7:
+            shl bx,1
+            mov word [si + bx], '7'
+            ret
+
+    toInput8:
+        mov bx, [cursorCol]         ; Get the column index
+        shl bx,1
+        cmp word [si + bx], ' '      ; Check if the current position contains a space
+        jne short_ret                ; If not a space, return without inputting
+
+        mov ax, '8'                  ; Prepare input '8'
+        mov bx, [cursorCol]          ; Get column index again (no need for shl bx, 1 here)
+        mov dx, [cursorRow]          ; Get the row index
+        call checkSudoku             ; Check if it's a valid move
+
+        cmp word [isValid], 1        ; Check if the move is valid (1 means valid)
+        je placeInput8               ; If valid, place the input
+        ret
+
+        placeInput8:
+            shl bx,1
+            mov word [si + bx], '8'
+            ret
+
+    toInput9:
+        mov bx, [cursorCol]         ; Get the column index
+        shl bx,1
+        cmp word [si + bx], ' '      ; Check if the current position contains a space
+        jne short_ret                ; If not a space, return without inputting
+
+        mov ax, '9'                  ; Prepare input '9'
+        mov bx, [cursorCol]          ; Get column index again (no need for shl bx, 1 here)
+        mov dx, [cursorRow]          ; Get the row index
+        call checkSudoku             ; Check if it's a valid move
+
+        cmp word [isValid], 1        ; Check if the move is valid (1 means valid)
+        je placeInput9              ; If valid, place the input
+        ret
+
+        placeInput9:
+            shl bx,1
+            mov word [si + bx], '9'
+            ret
+        
+        
+    toInput1Remain:
+        ; mov bx,[cursorColRemain]
+        ; shl bx,1
+        ; cmp word [si+bx],' '
+        ; jne short_ret
+        ; mov word [si+bx],'1'
+        ; ret
+        mov bx, [cursorCol]         ; Get the column index
+        shl bx,1
+        cmp word [si + bx], ' '      ; Check if the current position contains a space
+        jne short_ret                ; If not a space, return without inputting
+
+        mov ax, '1'                  ; Prepare input '1'
+        mov bx, [cursorCol]          ; Get column index again (no need for shl bx, 1 here)
+        mov dx, [cursorRow]          ; Get the row index
+        call checkSudoku             ; Check if it's a valid move
+        cmp word [isValid], 1        ; Check if the move is valid (1 means valid)
+        je placeInput1Remain                ; If valid, place the input
+        ret
+
+        placeInput1Remain:
+            shl bx,1
+            mov word [si + bx], '1'
+            ret
+
+    toInput2Remain:
+        mov bx, [cursorCol]         ; Get the column index
+        shl bx,1
+        cmp word [si + bx], ' '      ; Check if the current position contains a space
+        jne short_ret                ; If not a space, return without inputting
+
+        mov ax, '2'                  ; Prepare input '2'
+        mov bx, [cursorCol]          ; Get column index again (no need for shl bx, 1 here)
+        mov dx, [cursorRow]          ; Get the row index
+        call checkSudoku             ; Check if it's a valid move
+        cmp word [isValid], 1        ; Check if the move is valid (1 means valid)
+        je placeInput2Remain                ; If valid, place the input
+        ret
+
+        placeInput2Remain:
+            shl bx,1
+            mov word [si + bx], '2'
+            ret
+
+    toInput3Remain:
+        mov bx, [cursorCol]         ; Get the column index
+        shl bx,1
+        cmp word [si + bx], ' '      ; Check if the current position contains a space
+        jne short_ret                ; If not a space, return without inputting
+
+        mov ax, '3'                  ; Prepare input '3'
+        mov bx, [cursorCol]          ; Get column index again (no need for shl bx, 1 here)
+        mov dx, [cursorRow]          ; Get the row index
+        call checkSudoku             ; Check if it's a valid move
+        cmp word [isValid], 1        ; Check if the move is valid (1 means valid)
+        je placeInput3Remain                ; If valid, place the input
+        ret
+
+        placeInput3Remain:
+            shl bx,1
+            mov word [si + bx], '3'
+            ret
+
+    toInput4Remain:
+        mov bx, [cursorCol]         ; Get the column index
+        shl bx,1
+        cmp word [si + bx], ' '      ; Check if the current position contains a space
+        jne short_ret                ; If not a space, return without inputting
+
+        mov ax, '4'                  ; Prepare input '4'
+        mov bx, [cursorCol]          ; Get column index again (no need for shl bx, 1 here)
+        mov dx, [cursorRow]          ; Get the row index
+        call checkSudoku             ; Check if it's a valid move
+        cmp word [isValid], 1        ; Check if the move is valid (1 means valid)
+        je placeInput4Remain                ; If valid, place the input
+        ret
+
+        placeInput4Remain:
+            shl bx,1
+            mov word [si + bx], '4'
+            ret
+
+    toInput5Remain:
+        mov bx, [cursorCol]         ; Get the column index
+        shl bx,1
+        cmp word [si + bx], ' '      ; Check if the current position contains a space
+        jne short_ret                ; If not a space, return without inputting
+
+        mov ax, '5'                  ; Prepare input '5'
+        mov bx, [cursorCol]          ; Get column index again (no need for shl bx, 1 here)
+        mov dx, [cursorRow]          ; Get the row index
+        call checkSudoku             ; Check if it's a valid move
+        cmp word [isValid], 1        ; Check if the move is valid (1 means valid)
+        je placeInput5Remain                ; If valid, place the input
+        ret
+
+        placeInput5Remain:
+            shl bx,1
+            mov word [si + bx], '5'
+            ret
+
+    toInput6Remain:
+        mov bx, [cursorCol]         ; Get the column index
+        shl bx,1
+        cmp word [si + bx], ' '      ; Check if the current position contains a space
+        jne short_ret                ; If not a space, return without inputting
+
+        mov ax, '6'                  ; Prepare input '6'
+        mov bx, [cursorCol]          ; Get column index again (no need for shl bx, 1 here)
+        mov dx, [cursorRow]          ; Get the row index
+        call checkSudoku             ; Check if it's a valid move
+        cmp word [isValid], 1        ; Check if the move is valid (1 means valid)
+        je placeInput6Remain                ; If valid, place the input
+        ret
+
+        placeInput6Remain:
+            shl bx,1
+            mov word [si + bx], '6'
+            ret
+
+    toInput7Remain:
+        mov bx, [cursorCol]         ; Get the column index
+        shl bx,1
+        cmp word [si + bx], ' '      ; Check if the current position contains a space
+        jne short_ret                ; If not a space, return without inputting
+
+        mov ax, '7'                  ; Prepare input '7'
+        mov bx, [cursorCol]          ; Get column index again (no need for shl bx, 1 here)
+        mov dx, [cursorRow]          ; Get the row index
+        call checkSudoku             ; Check if it's a valid move
+        cmp word [isValid], 1        ; Check if the move is valid (1 means valid)
+        je placeInput7Remain                ; If valid, place the input
+        ret
+
+        placeInput7Remain:
+            shl bx,1
+            mov word [si + bx], '7'
+            ret
+
+    toInput8Remain:
+        mov bx, [cursorCol]         ; Get the column index
+        shl bx,1
+        cmp word [si + bx], ' '      ; Check if the current position contains a space
+        jne short_ret                ; If not a space, return without inputting
+
+        mov ax, '8'                  ; Prepare input '8'
+        mov bx, [cursorCol]          ; Get column index again (no need for shl bx, 1 here)
+        mov dx, [cursorRow]          ; Get the row index
+        call checkSudoku             ; Check if it's a valid move
+        cmp word [isValid], 1        ; Check if the move is valid (1 means valid)
+        je placeInput8Remain                ; If valid, place the input
+        ret
+
+        placeInput8Remain:
+            shl bx,1
+            mov word [si + bx], '8'
+            ret
+
+    toInput9Remain:
+        mov bx, [cursorCol]         ; Get the column index
+        shl bx,1
+        cmp word [si + bx], ' '      ; Check if the current position contains a space
+        jne short_ret                ; If not a space, return without inputting
+
+        mov ax, '9'                  ; Prepare input '9'
+        mov bx, [cursorCol]          ; Get column index again (no need for shl bx, 1 here)
+        mov dx, [cursorRow]          ; Get the row index
+        call checkSudoku             ; Check if it's a valid move
+        cmp word [isValid], 1        ; Check if the move is valid (1 means valid)
+        je placeInput9Remain                ; If valid, place the input
+        ret
+
+        placeInput9Remain:
+            shl bx,1
+            mov word [si + bx], '9'
+            ret
+
+    short_ret:
+        ret
+        
+
+    saveRow1:
+        mov si,row1
+        jmp tempNext
+    
+    saveRow2:
+        mov si,row2
+        jmp tempNext
+    
+    saveRow3:
+        mov si,row3
+        jmp tempNext
+    
+    saveRow4:
+        mov si,row4
+        jmp tempNext
+
+    saveRow5:
+        mov si,row5
+        jmp tempNext
+    
+    saveRow6:
+        mov si,row6
+        jmp tempNext
+
+    saveRow7:
+        mov si,row7
+        jmp tempNext
+
+    saveRow8:
+        mov si,row8
+        jmp tempNext
+
+    saveRow9:
+        mov si,row9
+        jmp tempNext
+        
+
 
     toEndGame:
         call toPage0Subroutine
@@ -1646,7 +2501,7 @@ moveCursorRightSubroutineRemain:
     mov ax,[cursorColRemain]
     cmp ax,8
     je moveCursorRightSubroutineReturnRemain  ; Change jmp to jge (jump if greater or equal)
-    mov [cursorCol],ax
+    mov [cursorColRemain],ax
     
     xor ax,ax
     mov al,4
@@ -1708,6 +2563,11 @@ moveCursorRightSubroutineRemain:
     moveCursorRightSubroutineReturnRemain:
         ret
 
+waitForKey:
+    mov ah,0
+    int 0x16
+    ret
+
 
 ; MAIN GAME FUNCTION
 gameSubroutine:
@@ -1719,7 +2579,8 @@ gameSubroutine:
         ; call turnoffspeakers
         ; call display_message_effect  
         ; call display_continue_msg 
-        ; call askForInput
+        ; call waitForKey
+        ; call play_correct_input_sound
 
     ; GAME CONFIGURATIONS
     SETTINGS:
@@ -1739,13 +2600,16 @@ gameSubroutine:
         call printRemainingColsSubroutine
         call printBorder
         call printBorderRemain
+
+    ; NUMBERS
+    NUMBERS:
         call printNumbers
         call printNumbersRemain
 
     ; MECHANICS
     MECHANICS:
         call askForInput
-        jmp GAMEBOARD
+        jmp NUMBERS
 
     ; END SCREEN
     FINAL:
