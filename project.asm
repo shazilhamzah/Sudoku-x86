@@ -79,6 +79,7 @@ thanks_msg db "Thanks for playing...", 0
 ; SCORE SCREEN PRINTING
 time: dw 'Time: 00:00',0
 scoreString: dw 'Score:',0
+lifeString: dw 'Lives Left:',0
 score: dw 0
 mistakes: dw 0
 gamestate: db 1
@@ -136,7 +137,6 @@ checkerboard_loosing_screen:
     ; Initialize variables
     xor di, di               
     mov cx, 2000              
-
 
 draw_checkerboard2:
     mov ax, 0x0201          
@@ -788,7 +788,33 @@ skip_sec:
         pop bx
         pop ax
 
-        iret                           ; Return from interrupt
+        ; iret                           ; Return from interrupt
+
+    ; score string printing
+    mov ax,36
+    push ax
+    mov ax,15
+    push ax
+    mov ax,7
+    push ax
+    mov ax,lifeString
+    push ax
+    mov ax,11
+    push ax
+    mov ax,0xbb00
+    mov es,ax
+    call printstr
+
+    ; life printing
+    push 2496
+    mov ax,5
+    sub ax,[mistakes]
+    push ax
+    call printnum
+
+
+    iret
+    
 
     
     update_time_string:
