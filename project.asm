@@ -9,9 +9,9 @@ row3: dw '4','3','7','1','5',' ',' ','6','2',0
 row4: dw '6',' ','1','9','4','2','7',' ','8',0
 row5: dw '7','9','2','5',' ','3','6','1','4',0
 row6: dw '3','4',' ',' ','7','1','2','5','9',0
-row7: dw '1','6','4','8','9','5','3','2','7',0
-row8: dw '5','8','3','7','2','4','1','9','6',0
-row9: dw '2','7',' ','3','1','6','4','8','5',0
+row7: dw '1','6','4','8','9','5','3','2',' ',0
+row8: dw '5','8','3','7','2','4','1','9',' ',0
+row9: dw '2','7',' ','3','1','6','4','8',' ',0
 
 mrow1: dw '8',' ','6','4',' ','9','5',' ',' ',0
 mrow2: dw '9',' ',' ','2','6','7','8','4','3',0
@@ -71,6 +71,13 @@ ms:  dw 0
 ticks: dw 0
 lastUpdateTime: dw 0
 ms_per_cycle equ 55 
+
+; PREV STATUS
+prevCursorRow dw 0
+prevCursorCol dw 0
+prevCursorRowRemain dw 0
+prevCursorColRemain dw 0
+prevPage db 0
 
 
 
@@ -1765,6 +1772,121 @@ decScore:
     ret
 
 
+; UNDO
+saveCurrentState:
+    push ax
+
+    mov ax,[cursorCol]
+    mov [prevCursorCol],ax
+    mov ax,[cursorColRemain]
+    mov [prevCursorColRemain],ax
+    mov ax,[cursorRow]
+    mov [prevCursorRow],ax
+    mov ax,[cursorRowRemain]
+    mov [prevCursorRowRemain],ax
+    mov ax,[currentPage]
+    mov [prevPage],ax  
+
+    pop ax
+    ret
+
+undoMove:
+    push ax
+    push bx
+    push cx
+    push si
+    push di
+
+    cmp byte [prevPage],0
+    je undoOnMainGrid
+    cmp byte [prevPage],2
+    je undoOnRemainGrid
+    jmp endUndo
+
+    undoOnMainGrid:
+        mov ax,[prevCursorRow]
+        cmp ax,0
+        je setRow1ForUndo
+        cmp ax,1
+        je setRow2ForUndo
+        cmp ax,2
+        je setRow3ForUndo
+        cmp ax,3
+        je setRow4ForUndo
+        cmp ax,4
+        je setRow5ForUndo
+        cmp ax,5
+        je setRow6ForUndo
+    undoOnRemainGrid:
+        mov ax,[prevCursorRowRemain]
+        cmp ax,0
+        je setRow7ForUndo
+        cmp ax,1
+        je setRow8ForUndo
+        cmp ax,2
+        je setRow9ForUndo
+    jmp endUndo
+
+    setRow1ForUndo:
+        mov si,row1
+        jmp doFurtherForPage0
+    setRow2ForUndo:
+        mov si,row2
+        jmp doFurtherForPage0
+    setRow3ForUndo:
+        mov si,row3
+        jmp doFurtherForPage0
+    setRow4ForUndo:
+        mov si,row4
+        jmp doFurtherForPage0
+    setRow5ForUndo:
+        mov si,row5
+        jmp doFurtherForPage0
+    setRow6ForUndo:
+        mov si,row6
+        jmp doFurtherForPage0
+    setRow7ForUndo:
+        mov si,row7
+        jmp doFurtherForPage2
+    setRow8ForUndo:
+        mov si,row8
+        jmp doFurtherForPage2
+    setRow9ForUndo:
+        mov si,row9
+        jmp doFurtherForPage2
+
+    doFurtherForPage0:
+            mov ax,[prevCursorCol]
+            shl ax,1
+            add si,ax
+            mov word [si],' '
+            jmp reset
+    doFurtherForPage2:
+            mov ax,[prevCursorColRemain]
+            shl ax,1
+            add si,ax
+            mov word [si],' '
+
+    reset:
+        mov ax,[prevCursorCol]
+        mov [cursorCol],ax
+        mov ax,[prevCursorRow]
+        mov [cursorRow],ax
+        mov ax,[prevCursorRowRemain]
+        mov [cursorRowRemain],ax
+        mov ax,[prevCursorColRemain]
+        mov [cursorColRemain],ax
+        mov ax,[prevPage]
+        mov [currentPage],ax
+
+    endUndo:
+        pop di
+        pop si
+        pop cx
+        pop bx
+        pop ax
+        ret
+
 
 ; INPUT HANDELING
 askForInput:
@@ -1780,6 +1902,10 @@ askForInput:
     je toScorePage
     cmp ah, 0x01    ; Escape key
     je toEndGame
+    cmp ah, 0x16    ; U key scan code
+    je undoLastMove
+
+
 
     ; SETTING si TO THE SPECIFIED ROW
 
@@ -1934,6 +2060,10 @@ askForInput:
     moveCursorRightRemain:
         call moveCursorRightSubroutineRemain
         jmp askForInputReturn
+
+    undoLastMove:
+        call undoMove
+        ret
     
     ; toInput1:
     ;     mov bx,[cursorCol]
@@ -1964,6 +2094,7 @@ askForInput:
         ret
 
         placeInput1:
+            call saveCurrentState
             shl bx,1
             mov word [si + bx], '1'
             ret
@@ -1988,6 +2119,7 @@ askForInput:
         ret
 
         placeInput2:
+            call saveCurrentState
             shl bx,1
             mov word [si + bx], '2'
             ret
@@ -2008,6 +2140,7 @@ askForInput:
         ret
 
         placeInput3:
+            call saveCurrentState
             shl bx,1
             mov word [si + bx], '3'
             ret
@@ -2034,6 +2167,7 @@ askForInput:
         ret
 
         placeInput4:
+            call saveCurrentState
             shl bx,1
             mov word [si + bx], '4'
             ret
@@ -2054,6 +2188,7 @@ askForInput:
         ret
 
         placeInput5:
+            call saveCurrentState
             shl bx,1
             mov word [si + bx], '5'
             ret
@@ -2074,6 +2209,7 @@ askForInput:
         ret
 
         placeInput6:
+            call saveCurrentState
             shl bx,1
             mov word [si + bx], '6'
             ret
@@ -2094,6 +2230,7 @@ askForInput:
         ret
 
         placeInput7:
+            call saveCurrentState
             shl bx,1
             mov word [si + bx], '7'
             ret
@@ -2114,6 +2251,7 @@ askForInput:
         ret
 
         placeInput8:
+            call saveCurrentState
             shl bx,1
             mov word [si + bx], '8'
             ret
@@ -2134,6 +2272,7 @@ askForInput:
         ret
 
         placeInput9:
+            call saveCurrentState
             shl bx,1
             mov word [si + bx], '9'
             ret
@@ -2160,6 +2299,7 @@ askForInput:
         ret
 
         placeInput1Remain:
+            call saveCurrentState
             shl bx,1
             mov word [si + bx], '1'
             ret
@@ -2179,6 +2319,7 @@ askForInput:
         ret
 
         placeInput2Remain:
+            call saveCurrentState
             shl bx,1
             mov word [si + bx], '2'
             ret
@@ -2198,6 +2339,7 @@ askForInput:
         ret
 
         placeInput3Remain:
+            call saveCurrentState
             shl bx,1
             mov word [si + bx], '3'
             ret
@@ -2217,6 +2359,7 @@ askForInput:
         ret
 
         placeInput4Remain:
+            call saveCurrentState
             shl bx,1
             mov word [si + bx], '4'
             ret
@@ -2236,6 +2379,7 @@ askForInput:
         ret
 
         placeInput5Remain:
+            call saveCurrentState
             shl bx,1
             mov word [si + bx], '5'
             ret
@@ -2255,6 +2399,7 @@ askForInput:
         ret
 
         placeInput6Remain:
+            call saveCurrentState
             shl bx,1
             mov word [si + bx], '6'
             ret
@@ -2274,6 +2419,7 @@ askForInput:
         ret
 
         placeInput7Remain:
+            call saveCurrentState
             shl bx,1
             mov word [si + bx], '7'
             ret
@@ -2293,6 +2439,7 @@ askForInput:
         ret
 
         placeInput8Remain:
+            call saveCurrentState
             shl bx,1
             mov word [si + bx], '8'
             ret
@@ -2312,6 +2459,7 @@ askForInput:
         ret
 
         placeInput9Remain:
+            call saveCurrentState
             shl bx,1
             mov word [si + bx], '9'
             ret
@@ -2905,6 +3053,7 @@ waitForKey:
     mov ah,0
     int 0x16
     ret
+
 
 
 ; MAIN GAME FUNCTION
