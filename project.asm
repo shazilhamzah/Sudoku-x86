@@ -137,13 +137,14 @@ checkerboard_loosing_screen:
     xor di, di               
     mov cx, 2000              
 
+
 draw_checkerboard2:
     mov ax, 0x0201          
     test di, 2                ; Check if current cell is even or odd
     jz alternate_color2
     mov ax, 0xD201          
 
-alternate_color2:
+    alternate_color2:
     stosw                     ; Write to video memory
     loop draw_checkerboard2
 
@@ -161,7 +162,7 @@ alternate_color2:
 	
     mov cx, 3                 ; Number of rows for sides
 
-draw_sides_and_text2:
+    draw_sides_and_text2:
     push cx                   ; Save the row count
 
     ; Left border
@@ -2165,6 +2166,7 @@ undoMove:
         mov [cursorColRemain],ax
         mov ax,[prevPage]
         mov [currentPage],ax
+        call decScore
 
 
         mov di, countofnumbers    ; Use SI as source
