@@ -50,7 +50,7 @@ verticalLine: db 124
 emptyString: db " "
 length: dw 1           ; length of the string
 noofboxes: dw 1
-countofnumbers: dw 3, 0, 2, 2, 1, 1, 1, 3, 2
+countofnumbers: dw 9, 9, 9, 9, 9, 9, 9, 9, 9
 
 ; WELCOME AND BYE PAGES PRINTING
 tone_divisors: dw 150
@@ -60,7 +60,7 @@ thanks_msg db "Thanks for playing...", 0
 
 ; SCORE SCREEN PRINTING
 time: dw 'Time: 00:00',0
-scoreString: dw 'Score: 0',0
+scoreString: dw 'Score:',0
 score: dw 0
 mistakes: dw 0
 gamestate: db 1
@@ -354,7 +354,8 @@ skip_sec:
     cmp byte [gamestate], 1          ; 1 = In-game
     jne skip_timer_update            ; Skip timer updates if not in-game
 	;je updation
-   
+    
+    ; timer printing
     mov ax,36
     push ax
     mov ax,11
@@ -368,30 +369,75 @@ skip_sec:
     mov ax,0xbb00
     mov es,ax
     call printstr
+    
+    ; score string printing
+    mov ax,36
+    push ax
+    mov ax,13
+    push ax
+    mov ax,7
+    push ax
+    mov ax,scoreString
+    push ax
+    mov ax,6
+    push ax
+    mov ax,0xbb00
+    mov es,ax
+    call printstr
 
-    ; Restore registers and end interrupt
-    mov al, 0x20                   ; End of interrupt command
-    out 0x20, al                   ; Send EOI to the PIC
-	pop di
-    pop bx
-    pop ax
+    ; score printing
+    cmp word [score], 0
+    jge print_pos       ; if score >= 0, print normally
+    
+    ; Handle negative score
+    mov ax, 0xbb00
+    mov es, ax          ; point es to video base
+    
+    ; Print minus sign first
+    mov di, 2164        ; Your desired position
+    mov byte [es:di], '-'
+    mov byte [es:di+1], 0x07  ; attribute
+    add di, 2           ; move position past minus sign
+    
+    ; Convert score to positive
+    mov ax, [score]
+    neg ax              ; make positive
+    push 2166          ; position after minus sign
+    push ax            ; push positive number
+    jmp do_print
 
-    iret                           ; Return from interrupt
+    print_pos:
+        mov ax, 0xbb00
+        mov es, ax          ; point es to video base
+        push 2164
+        push word [score]
+
+    do_print:
+        call printnum
+
+        ; Restore registers and end interrupt
+        mov al, 0x20                   ; End of interrupt command
+        out 0x20, al                   ; Send EOI to the PIC
+        pop di
+        pop bx
+        pop ax
+
+        iret                           ; Return from interrupt
 
     
- update_time_string:
-    ; Update seconds in time
-    mov al, byte [sec]
-    call byte_to_ascii
-    mov [time + 9], ah        ; Tens place of seconds
-    mov [time + 10], al       ; Units place of seconds
+    update_time_string:
+        ; Update seconds in time
+        mov al, byte [sec]
+        call byte_to_ascii
+        mov [time + 9], ah        ; Tens place of seconds
+        mov [time + 10], al       ; Units place of seconds
 
-    ; Update minutes in time
-    mov al, byte [min]
-    call byte_to_ascii
-    mov [time + 6], ah        ; Tens place of minutes
-    mov [time + 7], al        ; Units place of minutes
-    ret
+        ; Update minutes in time
+        mov al, byte [min]
+        call byte_to_ascii
+        mov [time + 6], ah        ; Tens place of minutes
+        mov [time + 7], al        ; Units place of minutes
+        ret
 
 
 
@@ -536,6 +582,47 @@ toPage3Subroutine:
     mov ax,0503h
     int 10h
     ret
+
+printnum: 
+    push bp
+    mov bp, sp
+    push es
+    push ax
+    push bx
+    push cx
+    push dx
+    push di
+
+    mov ax, [bp+4]      ; load number in ax
+    mov di, [bp+6]      ; load position from stack
+    
+    mov bx, 10          ; use base 10 for division
+    mov cx, 0           ; initialize count of digits
+
+nextdigit: 
+    mov dx, 0           ; zero upper half of dividend
+    div bx              ; divide by 10
+    add dl, 0x30        ; convert digit into ascii value
+    push dx             ; save ascii value on stack
+    inc cx              ; increment count of values
+    cmp ax, 0           ; is the quotient zero
+    jnz nextdigit       ; if no divide it again
+
+nextpos: 
+    pop dx              ; remove a digit from the stack
+    mov dh, 0x07        ; use normal attribute
+    mov [es:di], dx     ; print char on screen
+    add di, 2           ; move to next screen location
+    loop nextpos        ; repeat for all digits on stack
+
+    pop di
+    pop dx
+    pop cx
+    pop bx
+    pop ax
+    pop es
+    pop bp
+    ret 4               ; return and pop both parameters
 
 byte_to_ascii:
     ;-------------------------------------------------------------------------------
@@ -1594,7 +1681,7 @@ countNumbersInGrid:
     mov di, countofnumbers
     mov cx, 9
     clearCounts:
-        mov word [di], 0
+        mov word [di], 9
         add di, 2
         loop clearCounts
 
@@ -1614,7 +1701,7 @@ countNumbersInGrid:
         push di
         mov di, countofnumbers
         add di, ax                   ; Point to correct counter
-        inc word [di]                ; Increment that number's count
+        dec word [di]                ; Increment that number's count
         pop di
 
     nextCell:
@@ -1675,9 +1762,6 @@ incScore:
 
 decScore:
     sub word [score],200
-    mov al,byte [score]
-    mov ah,0x0E
-    int 10h
     ret
 
 
@@ -2827,14 +2911,13 @@ waitForKey:
 gameSubroutine:
     ; WELCOME SCREEN
     WELCOME:
-        ; call clrscr             
-        ; call startingscreen    
-        ; call clrscrwithdelay
-        ; call turnoffspeakers
-        ; call display_message_effect  
-        ; call display_continue_msg 
-        ; call waitForKey
-        ; call play_correct_input_sound
+        call clrscr             
+        call startingscreen    
+        call clrscrwithdelay
+        call turnoffspeakers
+        call display_message_effect  
+        call display_continue_msg 
+        call waitForKey
 
     ; GAME CONFIGURATIONS
     SETTINGS:
