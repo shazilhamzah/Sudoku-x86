@@ -72,12 +72,13 @@ ticks: dw 0
 lastUpdateTime: dw 0
 ms_per_cycle equ 55 
 
-; PREV STATUS
+; PREV STATUS FOR UNDO
 prevCursorRow dw 0
 prevCursorCol dw 0
 prevCursorRowRemain dw 0
 prevCursorColRemain dw 0
 prevPage db 0
+prevCardsRemaining: dw 0,0,0,0,0,0,0,0,0
 
 
 
@@ -1775,6 +1776,8 @@ decScore:
 ; UNDO
 saveCurrentState:
     push ax
+    push si
+    push di
 
     mov ax,[cursorCol]
     mov [prevCursorCol],ax
@@ -1786,7 +1789,19 @@ saveCurrentState:
     mov [prevCursorRowRemain],ax
     mov ax,[currentPage]
     mov [prevPage],ax  
+    
+    mov si, countofnumbers    ; Use SI as source
+    mov di, prevCardsRemaining ; Use DI as destination
+    mov cx,9
+    saveArray:
+        mov ax,[si]        ; Load from source
+        mov [di],ax       ; Store to destination
+        add si,2          ; Advance source pointer
+        add di,2          ; Advance destination pointer
+        loop saveArray
 
+    pop di
+    pop si
     pop ax
     ret
 
@@ -1878,6 +1893,19 @@ undoMove:
         mov [cursorColRemain],ax
         mov ax,[prevPage]
         mov [currentPage],ax
+
+
+        mov di, countofnumbers    ; Use SI as source
+        mov si, prevCardsRemaining ; Use DI as destination
+        mov cx,9
+        saveArray1:
+            mov ax,[si]        ; Load from source
+            mov [di],ax       ; Store to destination
+            add si,2          ; Advance source pointer
+            add di,2          ; Advance destination pointer
+            loop saveArray1
+
+        
 
     endUndo:
         pop di
