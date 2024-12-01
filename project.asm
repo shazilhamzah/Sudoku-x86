@@ -3,15 +3,25 @@ jmp start
 
 ; GRID - NUMBERS PRINTING
 numbers: dw '1','2','3','4','5','6','7','8','9',0
-row1: dw '8','2','6','4',' ','9','5',' ',' ',0
-row2: dw '9',' ','5','2','6','7','8','4','3',0
-row3: dw '4','3','7','1','5',' ',' ','6','2',0
-row4: dw '6',' ','1','9','4','2','7',' ','8',0
-row5: dw '7','9','2','5',' ','3','6','1','4',0
-row6: dw '3','4',' ',' ','7','1','2','5','9',0
-row7: dw '1','6','4','8','9','5','3','2',' ',0
-row8: dw '5','8','3','7','2','4','1','9',' ',0
-row9: dw '2','7',' ','3','1','6','4','8',' ',0
+; row1: dw '8','2','6','4',' ','9','5',' ',' ',0
+; row2: dw '9',' ','5','2','6','7','8','4','3',0
+; row3: dw '4','3','7','1','5',' ',' ','6','2',0
+; row4: dw '6',' ','1','9','4','2','7',' ','8',0
+; row5: dw '7','9','2','5',' ','3','6','1','4',0
+; row6: dw '3','4',' ',' ','7','1','2','5','9',0
+; row7: dw '1','6','4','8','9','5','3','2',' ',0
+; row8: dw '5','8','3','7','2','4','1','9',' ',0
+; row9: dw '2','7',' ','3','1','6','4','8',' ',0
+
+row1: dw ' ','2','6','4','3','9','5','7','1',0
+row2: dw ' ','1','5','2','6','7','8','4','3',0
+row3: dw '4','3','7','1','5','8','9','6','2',0
+row4: dw '6','5','1','9','4','2','7','3','8',0
+row5: dw '7','9','2','5','8','3','6','1','4',0
+row6: dw '3','4','8','6','7','1','2','5','9',0
+row7: dw '1','6','4','8','9','5','3','2','7',0
+row8: dw '5','8','3','7','2','4','1','9','6',0
+row9: dw '2','7','9','3','1','6','4','8','5',0
 
 mrow1: dw '8',' ','6','4',' ','9','5',' ',' ',0
 mrow2: dw '9',' ',' ','2','6','7','8','4','3',0
@@ -33,6 +43,13 @@ hrow7: dw ' ','6',' ',' ','9','5','3','2',' ',0
 hrow8: dw '5','8',' ',' ','2',' ',' ','9','6',0
 hrow9: dw ' ','7',' ','3','1',' ',' ','8','5',0
 
+;texts
+you_won_text: db '!','!','!', ' ','Y', 'O', 'U', ' ', 'W', 'O', 'N',' ','!','!','!'
+you_lost_text db '!','!','!', 'Y', 'O', 'U', ' ', 'L', 'O','S','T','!','!','!'
+
+;sound variable
+sound_index:dw 0
+
 
 ; GAME PLAYING VARIABLES
 rowAddress: dw 0
@@ -43,6 +60,7 @@ cursorCol: dw 0
 cursorColRemain: dw 0
 currentPage: dw 0
 isValid: dw 0
+isWin: db 0
 
 ; GRID - LINE PRINTING
 horizontalLine: db 196 ; string to be printed
@@ -79,6 +97,345 @@ prevCursorRowRemain dw 0
 prevCursorColRemain dw 0
 prevPage db 0
 prevCardsRemaining: dw 0,0,0,0,0,0,0,0,0
+
+
+; LOSING/WINING SCREENS
+play_loosing_sound:
+    .loop:
+
+                ; send DSP Command 10h
+                mov dx, 22ch
+                mov al, 10h
+                out dx, al
+
+                ; send byte audio sample
+                mov si, [sound_index]
+                mov al, [sound_data + si]
+                out dx, al
+
+                mov cx, 175 ;500 good
+            .delay:
+                nop
+                loop .delay
+
+                inc word [sound_index]
+                cmp word [sound_index], 12374
+                jb .loop
+                mov word[sound_index],0
+                ret
+        sound_data:
+            incbin "gov.wav"
+
+checkerboard_loosing_screen:
+    pusha
+
+   
+    mov ax, 0xB800
+    mov es, ax
+
+    ; Initialize variables
+    xor di, di               
+    mov cx, 2000              
+
+draw_checkerboard2:
+    mov ax, 0x0201          
+    test di, 2                ; Check if current cell is even or odd
+    jz alternate_color2
+    mov ax, 0xD201          
+
+alternate_color2:
+    stosw                     ; Write to video memory
+    loop draw_checkerboard2
+
+    ; Calculate the starting position for the border and text
+    mov di, 12 * 160 + 32 * 2 
+    ; Draw top border
+        mov cx, 16                ;length of border
+        mov ax, 0x2A0F            ; '*' character
+    draw_top_border2:
+        stosw
+        loop draw_top_border2
+
+    ; Draw sides and text
+    mov di, 12 * 160 + 34 * 2  
+	
+    mov cx, 3                 ; Number of rows for sides
+
+draw_sides_and_text2:
+    push cx                   ; Save the row count
+
+    ; Left border
+    mov ax, 0x2A0F            ; '*' character 
+
+    ; Display "!!!YOU lost!!!" on the middle row
+    cmp cx, 2
+    jne draw_right_border2     
+    mov si, you_lost_text
+    mov cx, 14                ; Length of "!!!YOU lost!!!"
+
+print_text2:
+    lodsb                     
+    mov ah, 0xF0             
+    stosw                     ; Write character and attribute to video memory
+    loop print_text2
+
+draw_right_border2:
+    mov ax, 0x2A0F            ; '*' 
+    stosw                  
+
+    add di, 160 - 4         ; Move to the next row 
+    pop cx                    ; Restore row count
+    loop draw_sides_and_text2
+
+    ; Draw bottom border
+    mov di, 14 * 160 + 32 * 2 
+    mov cx, 15                ; Length of the border
+
+draw_bottom_border2:
+    mov ax, 0x2A0F            ; '*' character 
+    stosw
+    loop draw_bottom_border2
+	
+	  mov di, 16 * 160 +46  * 2 
+	mov si,scoreString
+	mov cx,8
+
+print_score2:
+    lodsb
+    mov ah, 0xF0
+    stosw
+    loop print_score2
+
+    ; push 2668
+    ; push word [score]
+    ; mov ax,0xb800
+    ; mov es,ax
+    ; call printnum
+
+    ; mov di,2668        ; same position
+    ; mov cx,4           ; assuming score is 1 digit - adjust if needed
+    ; mov ah,0xF0        ; white background (0xF) and blinking black (0x0)
+    ; attr_loop1:
+    ;     inc di         ; move to attribute byte
+    ;     mov [es:di],ah ; set attribute
+    ;     inc di         ; move to next character
+    ;     loop attr_loop1
+    ;     mov ah,' '
+    ;     mov [es:di],ah
+
+    ; score printing
+    cmp word [score], 0
+    jge print_pos1       ; if score >= 0, print normally
+    
+    ; Handle negative score
+    mov ax, 0xb800
+    mov es, ax          ; point es to video base
+    
+    ; Print minus sign first
+    mov di, 2664        ; Your desired position
+    mov byte [es:di], '-'
+    mov byte [es:di+1], 0x07  ; attribute
+    add di, 2           ; move position past minus sign
+    
+    ; Convert score to positive
+    mov ax, [score]
+    neg ax              ; make positive
+    push 2666          ; position after minus sign
+    push ax            ; push positive number
+    jmp do_print1
+
+    print_pos1:
+        mov ax, 0xb800
+        mov es, ax          ; point es to video base
+        push 2666
+        push word [score]
+
+    do_print1:
+        call printnum
+    
+
+    mov di,2664        ; same position
+    mov cx,5           ; assuming score is 1 digit - adjust if needed
+    mov ah,0xF0        ; white background (0xF) and blinking black (0x0)
+    attr_loop1:
+        inc di         ; move to attribute byte
+        mov [es:di],ah ; set attribute
+        inc di         ; move to next character
+        loop attr_loop1
+
+    mov di, 16 * 160 + 24 * 2 
+	
+    mov si, time
+    mov cx, 11                ; Length of "Time: 00:00"
+
+print_time2:
+    lodsb
+    mov ah, 0xF0
+    stosw
+    loop print_time2
+
+    popa
+    ret
+	
+wrapper_make_loosing_screen:
+	  call checkerboard_loosing_screen
+
+loptiloop2:
+    call play_loosing_sound
+    jmp loptiloop2
+	ret
+    ;///////////////////////////////////////////////winning screen/////////////////////////
+
+checkerboard_winning_screen:
+    pusha
+
+    mov ax, 0xB800
+    mov es, ax
+
+    ; Initialize variables
+    xor di, di                
+    mov cx, 2000             
+
+draw_checkerboard:
+    mov ax, 0x0201          
+    test di, 2                ; Check if current cell is even or odd
+    jz alternate_color
+    mov ax, 0xD201            
+
+alternate_color:
+    stosw                     ; Write to video memory
+    loop draw_checkerboard
+
+
+    mov di, 12 * 160 + 32 * 2 ; Position for the top-left corner of the border
+    
+    ; Draw top border
+    mov cx, 17                ; Length of the border
+    mov ax, 0x2A0F            ; '*' character
+
+draw_top_border:
+    stosw
+    loop draw_top_border
+
+    ; Draw sides and text
+    mov di, 12 * 160 + 32 * 2  
+	
+    mov cx, 3                 ; Number of rows for sides
+
+draw_sides_and_text:
+    push cx                  
+
+    ; Left border
+    mov ax, 0x2A0F            ; '*' 
+    stosw
+
+    ; Display "!!!YOU WON!!!" on the middle row
+    cmp cx, 2
+    jne draw_right_border     
+    mov si, you_won_text
+    mov cx, 15                ; Length of "!!!YOU WON!!!"
+
+print_text:
+    lodsb                     
+    mov ah, 0xF0
+    stosw                    
+    loop print_text
+
+draw_right_border:
+    mov ax, 0x2A0F            ; '*' character 
+    stosw                    
+    add di, 160 - 4         ; Move to the next row 
+    pop cx                   
+    loop draw_sides_and_text
+
+    ; Draw bottom border
+    mov di, 14 * 160 + 32 * 2 
+    mov cx, 15                ; Length of the border
+
+draw_bottom_border:
+    mov ax, 0x2A0F            ; '*' character 
+    stosw
+    loop draw_bottom_border
+   
+    mov di, 16 * 160 +46  * 2
+	mov si,scoreString
+	mov cx,6
+
+    print_score:
+        lodsb
+        mov ah, 0xF0
+        stosw
+        loop print_score
+
+        push 2668
+        push word [score]
+        mov ax,0xb800
+        mov es,ax
+        call printnum
+
+        mov di,2668        ; same position
+        mov cx,4           ; assuming score is 1 digit - adjust if needed
+        mov ah,0xF0        ; white background (0xF) and blinking black (0x0)
+        attr_loop:
+            inc di         ; move to attribute byte
+            mov [es:di],ah ; set attribute
+            inc di         ; move to next character
+            loop attr_loop
+            mov ah,' '
+            mov [es:di],ah
+
+    mov di, 16 * 160 + 24 * 2 ; Position for time
+    
+    mov si, time
+    mov cx, 11                ; Length of "Time: 00:00"
+
+    print_time:
+        lodsb
+        mov ah, 0xF0
+        stosw
+        loop print_time
+        popa
+        ret
+
+play_winning_sound:
+    ; Set up PIT channel 2 in mode 3 (square wave)
+    mov al, 0xB6
+    out 0x43, al
+
+    ; High pitch tone
+    mov ax, 1193          ; Divider for ~1000 Hz
+    call set_frequency
+    call delay1
+
+    ; Medium pitch tone
+    mov ax, 1493          ; Divider for ~800 Hz
+    call set_frequency
+    call delay1
+
+    ; Higher pitch tone
+    mov ax, 995           ; Divider for ~1200 Hz
+    call set_frequency
+    call delay1
+
+    ; Return to medium pitch 
+    mov ax, 1493
+    call set_frequency
+    call delay1
+
+    ; Finish with a low pitch 
+    mov ax, 2387          ; Divider for ~400 Hz
+    call set_frequency
+    call delay1
+
+    ; Turn off the speaker
+    call turnoffspeakers
+    ret
+	wrapper_make_winning_screen:
+    call checkerboard_winning_screen
+    loptiloop:
+    call play_winning_sound
+    jmp loptiloop
+    ret
 
 
 
@@ -696,120 +1053,6 @@ makeSomethingBlink:
     pop bp
     ret 10 
 
-; check_sudoku:
-    ;     push si            ; Save registers
-    ;     push di
-    ;     push cx
-    ;     push dx
-    ;     push ax
-    ;     push bx
-
-    ;     ; Clear isValid to 0 by default
-    ;     mov word [isValid], 0
-
-    ;     ; Row Check
-    ;     ; Row Check
-        ; mov ax, bx        ; Copy bx (row index) into ax
-        ; shl ax, 1          ; Multiply bx by 2 (each row entry is 2 bytes, so we shift left by 1)
-        ; lea si, [rows + ax] ; Compute the address of the row and store it in si
-        ; mov cx, 9          ; Set cx to 9, representing the number of columns in the row
-        ;             ; Iterate over 9 columns
-
-    ;     row_check_loop:
-    ;         mov dl, byte [si]      ; Get the current cell value
-    ;         cmp dl, al             ; Compare with the number to check
-    ;         je sudoku_invalid      ; If found in the row, invalid
-    ;         add si, 2              ; Move to the next cell in the row
-    ;         loop row_check_loop    ; Continue checking the row
-
-    ;         ; Column Check
-    ;         mov di, bx             ; Save row index in di for column tracking
-    ;         mov cx, 9              ; Iterate over 9 rows
-    ;         mov si, [rows]         ; Start with the first row
-    ;     col_check_loop:
-    ;         mov dl, byte [si + bh * 2] ; Get the value in the column for the current row
-    ;         cmp dl, al             ; Compare with the number to check
-    ;         je sudoku_invalid      ; If found in the column, invalid
-    ;         add si, 18             ; Move to the same column in the next row (9 cells * 2 bytes)
-    ;         loop col_check_loop    ; Continue checking the column
-
-    ;         ; Box Check
-    ;         ; Calculate box start row and column
-    ;         mov cl, bl             ; Copy row index
-    ;         xor dx, dx             ; Clear DX
-    ;         div byte [3]           ; Divide by 3 to get box start row index in AX
-    ;         mul byte [3]           ; Multiply by 3 to get actual start row index
-    ;         mov si, ax             ; Box start row in SI
-    ;         mov cl, bh             ; Copy column index
-    ;         div byte [3]           ; Divide by 3 to get box start column index
-    ;         mul byte [3]           ; Multiply by 3 to get actual start column index
-    ;         mov di, ax             ; Box start column in DI
-
-    ;         ; Check the 3x3 box
-    ;         mov cx, 3              ; Outer loop for rows in the box
-    ;     box_row_loop:
-    ;         push cx                ; Save row loop counter
-    ;         mov cx, 3              ; Inner loop for columns in the box
-    ;         mov si, rows         ; Load the base address of the rows array
-    ;         mov bx, bx           ; Ensure `bx` contains the row index
-    ;         shl bx, 1            ; Multiply the row index by 2 (each address is 2 bytes)
-    ;         add si, bx           ; Add the offset to `si` to get the address of the desired row
-
-    ;     box_col_loop:
-    ;         mov dl, byte [si]    ; Get the value at the address (initially set to `si`)
-    ;         add si, di           ; Manually calculate `di * 2` by adding `di` twice
-    ;         add si, di
-
-    ;         cmp dl, al             ; Compare with the number to check
-    ;         je sudoku_invalid      ; If found in the box, invalid
-    ;         add di, 1              ; Move to the next column in the box
-    ;         loop box_col_loop      ; Continue checking the box row
-    ;         pop cx                 ; Restore row loop counter
-    ;         add si, 1              ; Move to the next row in the box
-    ;         loop box_row_loop      ; Continue checking the box
-
-    ;         ; If all checks pass, the number is valid
-    ;         mov word [isValid], 1
-    ;         jmp sudoku_done
-
-    ;     sudoku_invalid:
-    ;         ; If any check fails, mark as invalid
-    ;         mov word [isValid], 0
-
-    ;     sudoku_done:
-    ;         ; Restore registers
-    ;         pop bx
-    ;         pop ax
-    ;         pop dx
-    ;         pop cx
-    ;         pop di
-    ;         pop si
-    ;         ret
-
-; checkSudoku:
-    ;     ; AX => Number to check
-    ;     ; BX => COL NUMBER
-    ;     ; DX => ROW NUMBER
-        
-
-    ;     mov word [isValid],0
-
-    ;     checkCols:
-    ;         mov si,[row1]
-    ;         mov cx, 9
-    ;         add si,bx
-    ;         checkCol:
-    ;             cmp ax, [si]
-    ;             je returnCheckSudoku
-    ;             add si, 20
-    ;             loop checkCol
-
-    ;     mov word [isValid],1
-
-
-    ;     returnCheckSudoku: 
-    ;         ret
-
 checkSudoku:
     ; AX => Number to check
     ; BX => COL NUMBER
@@ -928,10 +1171,39 @@ checkSudoku:
     mistakesOver:
         call toPage0Subroutine
         call play_incorrect_input_sound
+        call wrapper_make_loosing_screen
+        ret
+
+gameWin:
+    push si
+    mov si,row1
+    mov cx,90
+    mov ax,' '
+    mov byte [isWin],0
+    checkWin:
+        cmp ax,[si]
+        je notWin
+        add si,2
+        loop checkWin
+    
+    mov byte [isWin],1
+    returnWinCondition:
+        pop si
+        ret
+
+    notWin:
+        mov byte [isWin],0
+        jmp returnWinCondition
+
+wrapperGameWin:
+    call gameWin
+    cmp byte [isWin],1
+    je matchWon
+    ret
+
+    matchWon:
+        call wrapper_make_winning_screen
         jmp FINAL
-
-
-
 
 
 ; PRINTING GRID AND NUMBERS
@@ -3088,13 +3360,13 @@ waitForKey:
 gameSubroutine:
     ; WELCOME SCREEN
     WELCOME:
-        call clrscr             
-        call startingscreen    
-        call clrscrwithdelay
-        call turnoffspeakers
-        call display_message_effect  
-        call display_continue_msg 
-        call waitForKey
+        ; call clrscr             
+        ; call startingscreen    
+        ; call clrscrwithdelay
+        ; call turnoffspeakers
+        ; call display_message_effect  
+        ; call display_continue_msg 
+        ; call waitForKey
 
     ; GAME CONFIGURATIONS
     SETTINGS:
@@ -3118,6 +3390,7 @@ gameSubroutine:
 
     ; NUMBERS
     NUMBERS:
+        call wrapperGameWin
         call printNumbers
         call printNumbersRemain
         call wrapper_count_numbers_in_grid

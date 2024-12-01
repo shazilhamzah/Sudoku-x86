@@ -197,7 +197,7 @@ draw_bottom_border2:
     loop draw_bottom_border2
 	
 	  mov di, 16 * 160 +46  * 2 
-	mov si,score
+	mov si,scoreString
 	mov cx,8
 
 print_score2:
@@ -205,6 +205,63 @@ print_score2:
     mov ah, 0xF0
     stosw
     loop print_score2
+
+    ; push 2668
+    ; push word [score]
+    ; mov ax,0xb800
+    ; mov es,ax
+    ; call printnum
+
+    ; mov di,2668        ; same position
+    ; mov cx,4           ; assuming score is 1 digit - adjust if needed
+    ; mov ah,0xF0        ; white background (0xF) and blinking black (0x0)
+    ; attr_loop1:
+    ;     inc di         ; move to attribute byte
+    ;     mov [es:di],ah ; set attribute
+    ;     inc di         ; move to next character
+    ;     loop attr_loop1
+    ;     mov ah,' '
+    ;     mov [es:di],ah
+
+    ; score printing
+    cmp word [score], 0
+    jge print_pos1       ; if score >= 0, print normally
+    
+    ; Handle negative score
+    mov ax, 0xb800
+    mov es, ax          ; point es to video base
+    
+    ; Print minus sign first
+    mov di, 2664        ; Your desired position
+    mov byte [es:di], '-'
+    mov byte [es:di+1], 0x07  ; attribute
+    add di, 2           ; move position past minus sign
+    
+    ; Convert score to positive
+    mov ax, [score]
+    neg ax              ; make positive
+    push 2666          ; position after minus sign
+    push ax            ; push positive number
+    jmp do_print1
+
+    print_pos1:
+        mov ax, 0xb800
+        mov es, ax          ; point es to video base
+        push 2666
+        push word [score]
+
+    do_print1:
+        call printnum
+    
+
+    mov di,2664        ; same position
+    mov cx,5           ; assuming score is 1 digit - adjust if needed
+    mov ah,0xF0        ; white background (0xF) and blinking black (0x0)
+    attr_loop1:
+        inc di         ; move to attribute byte
+        mov [es:di],ah ; set attribute
+        inc di         ; move to next character
+        loop attr_loop1
 
     mov di, 16 * 160 + 24 * 2 
 	
@@ -995,120 +1052,6 @@ makeSomethingBlink:
     pop es
     pop bp
     ret 10 
-
-; check_sudoku:
-    ;     push si            ; Save registers
-    ;     push di
-    ;     push cx
-    ;     push dx
-    ;     push ax
-    ;     push bx
-
-    ;     ; Clear isValid to 0 by default
-    ;     mov word [isValid], 0
-
-    ;     ; Row Check
-    ;     ; Row Check
-        ; mov ax, bx        ; Copy bx (row index) into ax
-        ; shl ax, 1          ; Multiply bx by 2 (each row entry is 2 bytes, so we shift left by 1)
-        ; lea si, [rows + ax] ; Compute the address of the row and store it in si
-        ; mov cx, 9          ; Set cx to 9, representing the number of columns in the row
-        ;             ; Iterate over 9 columns
-
-    ;     row_check_loop:
-    ;         mov dl, byte [si]      ; Get the current cell value
-    ;         cmp dl, al             ; Compare with the number to check
-    ;         je sudoku_invalid      ; If found in the row, invalid
-    ;         add si, 2              ; Move to the next cell in the row
-    ;         loop row_check_loop    ; Continue checking the row
-
-    ;         ; Column Check
-    ;         mov di, bx             ; Save row index in di for column tracking
-    ;         mov cx, 9              ; Iterate over 9 rows
-    ;         mov si, [rows]         ; Start with the first row
-    ;     col_check_loop:
-    ;         mov dl, byte [si + bh * 2] ; Get the value in the column for the current row
-    ;         cmp dl, al             ; Compare with the number to check
-    ;         je sudoku_invalid      ; If found in the column, invalid
-    ;         add si, 18             ; Move to the same column in the next row (9 cells * 2 bytes)
-    ;         loop col_check_loop    ; Continue checking the column
-
-    ;         ; Box Check
-    ;         ; Calculate box start row and column
-    ;         mov cl, bl             ; Copy row index
-    ;         xor dx, dx             ; Clear DX
-    ;         div byte [3]           ; Divide by 3 to get box start row index in AX
-    ;         mul byte [3]           ; Multiply by 3 to get actual start row index
-    ;         mov si, ax             ; Box start row in SI
-    ;         mov cl, bh             ; Copy column index
-    ;         div byte [3]           ; Divide by 3 to get box start column index
-    ;         mul byte [3]           ; Multiply by 3 to get actual start column index
-    ;         mov di, ax             ; Box start column in DI
-
-    ;         ; Check the 3x3 box
-    ;         mov cx, 3              ; Outer loop for rows in the box
-    ;     box_row_loop:
-    ;         push cx                ; Save row loop counter
-    ;         mov cx, 3              ; Inner loop for columns in the box
-    ;         mov si, rows         ; Load the base address of the rows array
-    ;         mov bx, bx           ; Ensure `bx` contains the row index
-    ;         shl bx, 1            ; Multiply the row index by 2 (each address is 2 bytes)
-    ;         add si, bx           ; Add the offset to `si` to get the address of the desired row
-
-    ;     box_col_loop:
-    ;         mov dl, byte [si]    ; Get the value at the address (initially set to `si`)
-    ;         add si, di           ; Manually calculate `di * 2` by adding `di` twice
-    ;         add si, di
-
-    ;         cmp dl, al             ; Compare with the number to check
-    ;         je sudoku_invalid      ; If found in the box, invalid
-    ;         add di, 1              ; Move to the next column in the box
-    ;         loop box_col_loop      ; Continue checking the box row
-    ;         pop cx                 ; Restore row loop counter
-    ;         add si, 1              ; Move to the next row in the box
-    ;         loop box_row_loop      ; Continue checking the box
-
-    ;         ; If all checks pass, the number is valid
-    ;         mov word [isValid], 1
-    ;         jmp sudoku_done
-
-    ;     sudoku_invalid:
-    ;         ; If any check fails, mark as invalid
-    ;         mov word [isValid], 0
-
-    ;     sudoku_done:
-    ;         ; Restore registers
-    ;         pop bx
-    ;         pop ax
-    ;         pop dx
-    ;         pop cx
-    ;         pop di
-    ;         pop si
-    ;         ret
-
-; checkSudoku:
-    ;     ; AX => Number to check
-    ;     ; BX => COL NUMBER
-    ;     ; DX => ROW NUMBER
-        
-
-    ;     mov word [isValid],0
-
-    ;     checkCols:
-    ;         mov si,[row1]
-    ;         mov cx, 9
-    ;         add si,bx
-    ;         checkCol:
-    ;             cmp ax, [si]
-    ;             je returnCheckSudoku
-    ;             add si, 20
-    ;             loop checkCol
-
-    ;     mov word [isValid],1
-
-
-    ;     returnCheckSudoku: 
-    ;         ret
 
 checkSudoku:
     ; AX => Number to check
