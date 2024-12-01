@@ -61,6 +61,8 @@ thanks_msg db "Thanks for playing...", 0
 ; SCORE SCREEN PRINTING
 time: dw 'Time: 00:00',0
 scoreString: dw 'Score: 0',0
+score: dw 0
+mistakes: dw 0
 gamestate: db 1
 hrs: dw 0
 min: dw 0
@@ -810,6 +812,7 @@ checkSudoku:
     mov byte [isValid],1 
     call play_correct_input_sound
     call turnoffspeakers       
+    call incScore
     skipCheck:
         pop di
         pop si
@@ -820,63 +823,18 @@ checkSudoku:
         ret
 
     incorrect:
+        call decScore
+        inc word [mistakes]
+        cmp word [mistakes],5
+        je mistakesOver
         call play_incorrect_input_sound
         jmp skipCheck
 
-countNumbersInGrid:
-    ; DX => Base address of the grid (9x9, each element is a word)
-    ; The count array is at `countofnumbers`
+    mistakesOver:
+        call toPage0Subroutine
+        call play_incorrect_input_sound
+        jmp FINAL
 
-    push ax
-    push bx
-    push cx
-    push dx
-    push si
-    push di
-
-    ; First clear all counts
-    mov di, countofnumbers
-    mov cx, 9
-    clearCounts:
-        mov word [di], 0
-        add di, 2
-        loop clearCounts
-
-    ; Now count numbers
-    mov di,countofnumbers
-    mov si, dx                    ; SI points to start of grid
-    mov cx, 90                    ; Total cells to check
-
-    countLoop:
-        mov ax, word [si]            ; Get current cell value
-        cmp ax, ' '                  ; Skip if space
-        je nextCell
-        
-        ; Convert number to array index and increment
-        sub ax, '1'                  ; Convert '1'-'9' to 0-8
-        shl ax, 1                    ; Multiply by 2 for word offset
-        push di
-        mov di, countofnumbers
-        add di, ax                   ; Point to correct counter
-        inc word [di]                ; Increment that number's count
-        pop di
-
-    nextCell:
-        add si, 2                    ; Move to next cell
-        loop countLoop
-
-        pop di
-        pop si
-        pop dx
-        pop cx
-        pop bx
-        pop ax
-        ret
-
-wrapper_count_numbers_in_grid:
-    mov dx,row1
-    call countNumbersInGrid
-    ret
 
 
 
@@ -1613,12 +1571,68 @@ print_numbered_square:
         popa
         ret
     wrapper_make_number_boxes:
+        mov word [noofboxes], 1 ; Reset to the first box before starting
         mov cx, 9              ; Loop for 9 boxes
     loop_boxes:
         call print_numbered_square
         loop loop_boxes
         call print_numbers_bottom
         ret
+
+countNumbersInGrid:
+    ; DX => Base address of the grid (9x9, each element is a word)
+    ; The count array is at `countofnumbers`
+
+    push ax
+    push bx
+    push cx
+    push dx
+    push si
+    push di
+
+    ; First clear all counts
+    mov di, countofnumbers
+    mov cx, 9
+    clearCounts:
+        mov word [di], 0
+        add di, 2
+        loop clearCounts
+
+    ; Now count numbers
+    mov di,countofnumbers
+    mov si, dx                    ; SI points to start of grid
+    mov cx, 90                    ; Total cells to check
+
+    countLoop:
+        mov ax, word [si]            ; Get current cell value
+        cmp ax, ' '                  ; Skip if space
+        je nextCell
+        
+        ; Convert number to array index and increment
+        sub ax, '1'                  ; Convert '1'-'9' to 0-8
+        shl ax, 1                    ; Multiply by 2 for word offset
+        push di
+        mov di, countofnumbers
+        add di, ax                   ; Point to correct counter
+        inc word [di]                ; Increment that number's count
+        pop di
+
+    nextCell:
+        add si, 2                    ; Move to next cell
+        loop countLoop
+
+        pop di
+        pop si
+        pop dx
+        pop cx
+        pop bx
+        pop ax
+        ret
+
+wrapper_count_numbers_in_grid:
+    mov dx,row1
+    call countNumbersInGrid
+    ret
 
 
 
@@ -1655,6 +1669,16 @@ scorePrintSubroutine:
     call printstr
     ret
 
+incScore:
+    add word [score],200
+    ret
+
+decScore:
+    sub word [score],200
+    mov al,byte [score]
+    mov ah,0x0E
+    int 10h
+    ret
 
 
 
@@ -2830,7 +2854,6 @@ gameSubroutine:
         call printRemainingColsSubroutine
         call printBorder
         call printBorderRemain
-        call wrapper_count_numbers_in_grid
         
 
     ; NUMBERS
