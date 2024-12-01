@@ -735,7 +735,7 @@ checkSudoku:
 
     checkCol:
         cmp ax, [si]                  ; Compare input with the value in this cell
-        je skipCheck                  ; If it matches, skip this cell (we're modifying it)
+        je incorrect                  ; If it matches, skip this cell (we're modifying it)
         add si, 20                    ; Move to the next row in the column (each row is 20 bytes)
         loop checkCol                 ; Continue looping through rows
 
@@ -803,11 +803,11 @@ checkSudoku:
 
     checkRow:      
         cmp ax,[si]
-        je skipCheck
+        je incorrect
         add si,2
         loop checkRow
 
-    mov byte [isValid],1
+    mov byte [isValid],1        
     skipCheck:
         pop di
         pop si
@@ -816,6 +816,10 @@ checkSudoku:
         pop bx
         pop ax
         ret
+
+    incorrect:
+        call play_incorrect_input_sound
+        jmp skipCheck
 
 
 
@@ -1797,6 +1801,7 @@ askForInput:
         placeInput1:
             shl bx,1
             mov word [si + bx], '1'
+            call play_correct_input_sound
             ret
     
 
@@ -1821,6 +1826,7 @@ askForInput:
         placeInput2:
             shl bx,1
             mov word [si + bx], '2'
+            call play_correct_input_sound
             ret
 
     toInput3:
@@ -1841,6 +1847,7 @@ askForInput:
         placeInput3:
             shl bx,1
             mov word [si + bx], '3'
+            call play_correct_input_sound
             ret
 
     toInput4:
@@ -1867,6 +1874,7 @@ askForInput:
         placeInput4:
             shl bx,1
             mov word [si + bx], '4'
+            call play_correct_input_sound
             ret
 
     toInput5:
@@ -1887,6 +1895,7 @@ askForInput:
         placeInput5:
             shl bx,1
             mov word [si + bx], '5'
+            call play_correct_input_sound
             ret
 
     toInput6:
@@ -1907,6 +1916,7 @@ askForInput:
         placeInput6:
             shl bx,1
             mov word [si + bx], '6'
+            call play_correct_input_sound
             ret
 
     toInput7:
@@ -1927,6 +1937,7 @@ askForInput:
         placeInput7:
             shl bx,1
             mov word [si + bx], '7'
+            call play_correct_input_sound
             ret
 
     toInput8:
@@ -1947,6 +1958,7 @@ askForInput:
         placeInput8:
             shl bx,1
             mov word [si + bx], '8'
+            call play_correct_input_sound
             ret
 
     toInput9:
@@ -1967,6 +1979,7 @@ askForInput:
         placeInput9:
             shl bx,1
             mov word [si + bx], '9'
+            call play_correct_input_sound
             ret
         
         
@@ -1993,6 +2006,7 @@ askForInput:
         placeInput1Remain:
             shl bx,1
             mov word [si + bx], '1'
+            call play_correct_input_sound
             ret
 
     toInput2Remain:
@@ -2012,6 +2026,7 @@ askForInput:
         placeInput2Remain:
             shl bx,1
             mov word [si + bx], '2'
+            call play_correct_input_sound
             ret
 
     toInput3Remain:
@@ -2031,6 +2046,7 @@ askForInput:
         placeInput3Remain:
             shl bx,1
             mov word [si + bx], '3'
+            call play_correct_input_sound
             ret
 
     toInput4Remain:
@@ -2050,6 +2066,7 @@ askForInput:
         placeInput4Remain:
             shl bx,1
             mov word [si + bx], '4'
+            call play_correct_input_sound
             ret
 
     toInput5Remain:
@@ -2069,6 +2086,7 @@ askForInput:
         placeInput5Remain:
             shl bx,1
             mov word [si + bx], '5'
+            call play_correct_input_sound
             ret
 
     toInput6Remain:
@@ -2088,6 +2106,7 @@ askForInput:
         placeInput6Remain:
             shl bx,1
             mov word [si + bx], '6'
+            call play_correct_input_sound
             ret
 
     toInput7Remain:
@@ -2107,6 +2126,7 @@ askForInput:
         placeInput7Remain:
             shl bx,1
             mov word [si + bx], '7'
+            call play_correct_input_sound
             ret
 
     toInput8Remain:
@@ -2126,6 +2146,7 @@ askForInput:
         placeInput8Remain:
             shl bx,1
             mov word [si + bx], '8'
+            call play_correct_input_sound
             ret
 
     toInput9Remain:
@@ -2145,6 +2166,7 @@ askForInput:
         placeInput9Remain:
             shl bx,1
             mov word [si + bx], '9'
+            call play_correct_input_sound
             ret
 
     short_ret:
