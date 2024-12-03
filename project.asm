@@ -3,25 +3,35 @@ jmp start
 
 ; GRID - NUMBERS PRINTING
 numbers: dw '1','2','3','4','5','6','7','8','9',0
-; row1: dw '8','2','6','4',' ','9','5',' ',' ',0
-; row2: dw '9',' ','5','2','6','7','8','4','3',0
-; row3: dw '4','3','7','1','5',' ',' ','6','2',0
-; row4: dw '6',' ','1','9','4','2','7',' ','8',0
-; row5: dw '7','9','2','5',' ','3','6','1','4',0
-; row6: dw '3','4',' ',' ','7','1','2','5','9',0
-; row7: dw '1','6','4','8','9','5','3','2',' ',0
-; row8: dw '5','8','3','7','2','4','1','9',' ',0
-; row9: dw '2','7',' ','3','1','6','4','8',' ',0
+erow1: dw '8','2','6','4',' ','9','5',' ',' ',0
+erow2: dw '9',' ','5','2','6','7','8','4','3',0
+erow3: dw '4','3','7','1','5',' ',' ','6','2',0
+erow4: dw '6',' ','1','9','4','2','7',' ','8',0
+erow5: dw '7','9','2','5',' ','3','6','1','4',0
+erow6: dw '3','4',' ',' ','7','1','2','5','9',0
+erow7: dw '1','6','4','8','9','5','3','2',' ',0
+erow8: dw '5','8','3','7','2','4','1','9',' ',0
+erow9: dw '2','7',' ','3','1','6','4','8',' ',0
 
-row1: dw ' ','2','6','4','3','9','5','7','1',0
-row2: dw ' ','1','5','2','6','7','8','4','3',0
-row3: dw '4','3','7','1','5','8','9','6','2',0
-row4: dw '6','5','1','9','4','2','7','3','8',0
-row5: dw '7','9','2','5','8','3','6','1','4',0
-row6: dw '3','4','8','6','7','1','2','5','9',0
-row7: dw '1','6','4','8','9','5','3','2','7',0
-row8: dw '5','8','3','7','2','4','1','9','6',0
-row9: dw '2','7','9','3','1','6','4','8','5',0
+row1: dw 0
+row2: dw 0
+row3: dw 0
+row4: dw 0
+row5: dw 0
+row6: dw 0
+row7: dw 0
+row8: dw 0
+row9: dw 0
+
+; erow1: dw ' ','2','6','4','3','9','5','7','1',0
+; erow2: dw ' ','1','5','2','6','7','8','4','3',0
+; erow3: dw '4','3','7','1','5','8','9','6','2',0
+; erow4: dw '6','5','1','9','4','2','7','3','8',0
+; erow5: dw '7','9','2','5','8','3','6','1','4',0
+; erow6: dw '3','4','8','6','7','1','2','5','9',0
+; erow7: dw '1','6','4','8','9','5','3','2','7',0
+; erow8: dw '5','8','3','7','2','4','1','9','6',0
+; erow9: dw '2','7','9','3','1','6','4','8','5',0
 
 mrow1: dw '8',' ','6','4',' ','9','5',' ',' ',0
 mrow2: dw '9',' ',' ','2','6','7','8','4','3',0
@@ -53,7 +63,7 @@ sound_index:dw 0
 
 ; GAME PLAYING VARIABLES
 rowAddress: dw 0
-difficulty: dw 0
+difficulty: dw 0    ; 1,2,3 - EASY,MED,HARD respectively
 cursorRow: dw 0
 cursorRowRemain: dw 0
 cursorCol: dw 0
@@ -73,7 +83,7 @@ countofnumbers: dw 9, 9, 9, 9, 9, 9, 9, 9, 9
 ; WELCOME AND BYE PAGES PRINTING
 tone_divisors: dw 150
 message: db "Welcome to Sudoku", 0              
-continue_msg: db "Press any key to continue...", 0
+continue_msg: db "Press B for EASY, N for MEDIUM, M for HARD", 0
 thanks_msg db "Thanks for playing...", 0
 
 ; SCORE SCREEN PRINTING
@@ -99,6 +109,9 @@ prevCursorColRemain dw 0
 prevPage db 0
 prevCardsRemaining: dw 0,0,0,0,0,0,0,0,0
 
+completion_sound_data: db 12, 20, 28, 36, 44, 52, 60, 68, 76, 84 ; Example sound pattern
+completion_sound_length: equ $ - completion_sound_data ; Length of the sound pattern
+
 
 ; LOSING/WINING SCREENS
 play_loosing_sound:
@@ -123,22 +136,21 @@ play_loosing_sound:
                 cmp word [sound_index], 12374
                 jb .loop
                 mov word[sound_index],0
-                ret
-        sound_data:
-            incbin "gov.wav"
+    ret
+
+sound_data:
+    incbin "gov.wav"
 
 checkerboard_loosing_screen:
-    pusha
-
-   
+    pusha   
     mov ax, 0xB800
     mov es, ax
 
     ; Initialize variables
     xor di, di               
     mov cx, 2000              
-
-draw_checkerboard2:
+    
+    draw_checkerboard2:
     mov ax, 0x0201          
     test di, 2                ; Check if current cell is even or odd
     jz alternate_color2
@@ -174,7 +186,7 @@ draw_checkerboard2:
     mov si, you_lost_text
     mov cx, 14                ; Length of "!!!YOU lost!!!"
 
-print_text2:
+    print_text2:
     lodsb                     
     mov ah, 0xF0             
     stosw                     ; Write character and attribute to video memory
@@ -438,12 +450,50 @@ play_winning_sound:
     jmp loptiloop
     ret
 
+play_completion_sound:
+    ; Set PIT channel 2 mode 3
+    mov al, 0xB6  
+    out 0x43, al
+
+    ; Descending pattern
+    mov ax, 995   ; ~1200 Hz
+    call set_frequency
+    call delay1
+
+    mov ax, 1493  ; ~800 Hz
+    call set_frequency 
+    call delay1
+
+    mov ax, 2387  ; ~400 Hz
+    call set_frequency
+    call delay2
+
+    ; Low warble effect
+    mov ax, 2793  ; ~340 Hz
+    call set_frequency
+    call delay1
+    
+    mov ax, 3193  ; ~300 Hz
+    call set_frequency
+    call delay2
+
+    call turnoffspeakers
+    ret
+
+wrapper_play_completion_sound:
+    losing_loop:
+        call play_completion_sound
+        call play_completion_sound
+        call play_completion_sound
+        call play_completion_sound
+        ret
 
 
 ; SOUND AND TIMER
 correct_input:
     pusha
     call play_correct_input_sound   ;//////////////idk may be thori lambi ho but it can be adjusted ///// can also be played for row completion
+    call delay
     popa
     ret
     ;this will play for row and completion it will have like a 1 sec delay in the game
@@ -1094,10 +1144,10 @@ checkSudoku:
 
     ; Check if the number already exists in the column (excluding the current row)
     columnConfig:
-        mov si, row1                ; Start with the first row (row1)
+        mov si, [row1]                ; Start with the first row ([row1])
         mov cx, 9                     ; Loop through 9 rows
         shl bx, 1                     ; Multiply column number by 2 (since each element is a word)
-        add si, bx                    ; Move to the column in row1
+        add si, bx                    ; Move to the column in [row1]
         shr bx, 1                     ; Restore column index after the shift
 
     checkCol:
@@ -1114,55 +1164,55 @@ checkSudoku:
 
     setRow:
         cmp byte [cursorRow], 0
-        je setRow1
+        je setrow1
         cmp byte [cursorRow], 1
-        je setRow2
+        je setrow2
         cmp byte [cursorRow], 2
-        je setRow3
+        je setrow3
         cmp byte [cursorRow], 3
-        je setRow4
+        je setrow4
         cmp byte [cursorRow], 4
-        je setRow5
+        je setrow5
         cmp byte [cursorRow], 5
-        je setRow6
+        je setrow6
         jmp rowConfig
 
-        
+    
     setRowRemain:
         cmp byte [cursorRowRemain], 0
-        je setRow7
+        je setrow7
         cmp byte [cursorRowRemain], 1
-        je setRow8
+        je setrow8
         cmp byte [cursorRowRemain], 2
-        je setRow9
+        je setrow9
         jmp skipCheck
 
-    setRow1:
-        mov si, row1
+    setrow1:
+        mov si, [row1]
         jmp rowConfig
-    setRow2:
-        mov si, row2
+    setrow2:
+        mov si, [row2]
         jmp rowConfig
-    setRow3:
-        mov si, row3
+    setrow3:
+        mov si, [row3]
         jmp rowConfig
-    setRow4:
-        mov si, row4
+    setrow4:
+        mov si, [row4]
         jmp rowConfig
-    setRow5:
-        mov si, row5
+    setrow5:
+        mov si, [row5]
         jmp rowConfig
-    setRow6:
-        mov si, row6
+    setrow6:
+        mov si, [row6]
         jmp rowConfig
-    setRow7:
-        mov si, row7
+    setrow7:
+        mov si, [row7]
         jmp rowConfig
-    setRow8:
-        mov si, row8
+    setrow8:
+        mov si, [row8]
         jmp rowConfig
-    setRow9:
-        mov si, row9
+    setrow9:
+        mov si, [row9]
         jmp rowConfig
 
     rowConfig:
@@ -1203,7 +1253,7 @@ checkSudoku:
 
 gameWin:
     push si
-    mov si,row1
+    mov si,[row1]
     mov cx,90
     mov ax,' '
     mov byte [isWin],0
@@ -1231,6 +1281,237 @@ wrapperGameWin:
     matchWon:
         call wrapper_make_winning_screen
         jmp FINAL
+
+    ; checkCompletedLines:
+    ;     push ax
+    ;     push bx
+    ;     push cx
+    ;     push dx
+    ;     push si
+        
+    ;     cmp byte [currentPage], 0
+    ;     je setRowCompleted
+    ;     cmp byte [currentPage], 2
+    ;     je setRowRemainCompleted
+
+    ;     setRowCompleted:
+    ;         cmp byte [cursorRow], 0
+    ;         je setrow1Completed
+    ;         cmp byte [cursorRow], 1
+    ;         je setrow2Completed
+    ;         cmp byte [cursorRow], 2
+    ;         je setrow3Completed
+    ;         cmp byte [cursorRow], 3
+    ;         je setrow4Completed
+    ;         cmp byte [cursorRow], 4
+    ;         je setrow5Completed
+    ;         cmp byte [cursorRow], 5
+    ;         je setrow6Completed
+    ;         jmp rowConfigCompleted
+
+        
+    ;     setRowRemainCompleted:
+    ;         cmp byte [cursorRowRemain], 0
+    ;         je setrow7Completed
+    ;         cmp byte [cursorRowRemain], 1
+    ;         je setrow8Completed
+    ;         cmp byte [cursorRowRemain], 2
+    ;         je setrow9Completed
+    ;         jmp skipCheckCompleted
+
+    ;     setrow1Completed:
+    ;         mov si, [row1]
+    ;         jmp rowConfigCompleted
+    ;     setrow2Completed:
+    ;         mov si, [row2]
+    ;         jmp rowConfigCompleted
+    ;     setrow3Completed:
+    ;         mov si, [row3]
+    ;         jmp rowConfigCompleted
+    ;     setrow4Completed:
+    ;         mov si, [row4]
+    ;         jmp rowConfigCompleted
+    ;     setrow5Completed:
+    ;         mov si, [row5]
+    ;         jmp rowConfigCompleted
+    ;     setrow6Completed:
+    ;         mov si, [row6]
+    ;         jmp rowConfigCompleted
+    ;     setrow7Completed:
+    ;         mov si, [row7]
+    ;         jmp rowConfigCompleted
+    ;     setrow8Completed:
+    ;         mov si, [row8]
+    ;         jmp rowConfigCompleted
+    ;     setrow9Completed:
+    ;         mov si, [row9]
+    ;         jmp rowConfigCompleted
+
+
+    ;     rowConfigCompleted:
+    ;         mov cx,9
+    ;         mov ax,' '
+
+    ;     checkRowCompleted:
+    ;         cmp ax,[si]
+    ;         jne columnConfigCompleted
+    ;         add si,2
+    ;         dec cx
+    ;         jnz checkRowCompleted
+    ;         call play_completion_sound
+    ;         jmp columnConfigCompleted
+
+    ;     columnConfigCompleted:
+    ;         mov cx,9
+    ;         mov si,[row1]
+    ;         mov bx,[cursorCol]
+    ;         shl bx,2
+    ;         add si,bx   
+    ;         mov ax,' '
+
+    ;     checkColumnCompleted:
+    ;         cmp ax,[si]
+    ;         jne skipCheckCompleted
+    ;         add si,20
+    ;         loop checkColumnCompleted
+
+    ;     call play_completion_sound
+
+
+    ;     skipCheckCompleted:
+    ;         pop si
+    ;         pop dx
+    ;         pop cx
+    ;         pop bx
+    ;         pop ax
+    ;         ret
+checkCompletedLines:
+   push ax
+   push bx
+   push cx
+   push dx
+   push si
+   
+   mov si, [row1]        ; Start at first row
+   mov bx, [cursorCol]
+   shl bx, 1            ; Multiply column by 2 for offset
+   
+   ; Check row completion
+   mov cx, 9
+   mov ax, ' '          ; Space character
+   push si              ; Save row start position
+   
+   .check_row:
+       cmp [si], ax     ; Compare with space
+       je .row_not_complete
+       add si, 2
+       loop .check_row
+       
+   call play_completion_sound     ; Row is complete
+   call turnoffspeakers
+   
+   .row_not_complete:
+   pop si              ; Restore row start position
+   
+   ; Check column completion
+   mov si, [row1]      ; Start at first row
+   add si, bx          ; Move to current column
+   mov cx, 9
+   
+   .check_column:
+       cmp [si], ax    ; Compare with space
+       je .column_not_complete
+       add si, 20      ; Move to next row
+       loop .check_column
+       
+   call play_completion_sound    ; Column is complete
+   call turnoffspeakers
+   
+   .column_not_complete:
+   pop si
+   pop dx
+   pop cx
+   pop bx
+   pop ax
+   ret
+setRowCompleted:
+    cmp byte [cursorRow], 0
+    je setrow1Completed
+    cmp byte [cursorRow], 1
+    je setrow2Completed
+    cmp byte [cursorRow], 2
+    je setrow3Completed
+    cmp byte [cursorRow], 3
+    je setrow4Completed
+    cmp byte [cursorRow], 4
+    je setrow5Completed
+    cmp byte [cursorRow], 5
+    je setrow6Completed
+    jmp rowConfigCompleted
+
+setRowRemainCompleted:
+    cmp byte [cursorRowRemain], 0
+    je setrow7Completed
+    cmp byte [cursorRowRemain], 1
+    je setrow8Completed
+    cmp byte [cursorRowRemain], 2
+    je setrow9Completed
+    jmp skipCheckCompleted
+
+setrow1Completed: mov si, [row1] 
+jmp rowConfigCompleted
+setrow2Completed: mov si, [row2] 
+jmp rowConfigCompleted
+setrow3Completed: mov si, [row3]
+ jmp rowConfigCompleted
+setrow4Completed: mov si, [row4] 
+jmp rowConfigCompleted
+setrow5Completed: mov si, [row5] 
+jmp rowConfigCompleted
+setrow6Completed: mov si, [row6] 
+jmp rowConfigCompleted
+setrow7Completed: mov si, [row7] 
+jmp rowConfigCompleted
+setrow8Completed: mov si, [row8] 
+jmp rowConfigCompleted
+setrow9Completed: mov si, [row9] 
+jmp rowConfigCompleted
+
+rowConfigCompleted:
+    mov cx, 9
+    mov ax, 0 ; Assume 0 represents an unfilled cell in Sudoku
+
+checkRowCompleted:
+    cmp ax, [si]        ; Check if cell is unfilled
+    jne columnConfigCompleted
+    add si, 2           ; Move to the next cell
+    dec cx
+    jnz checkRowCompleted
+    call play_completion_sound ; Row completed sound
+
+columnConfigCompleted:
+    ; Check the column corresponding to the cursor position
+    mov cx, 9
+    mov si, [row1]      ; Start from the first row
+    mov bx, [cursorCol]
+    shl bx, 1           ; Scale cursorCol by 2 (word size)
+    add si, bx          ; Point to the current column
+    mov ax, 0
+
+checkColumnCompleted:
+    cmp ax, [si]        ; Check if cell is unfilled
+    jne skipCheckCompleted
+    add si, 20          ; Move to the same column in the next row
+    loop checkColumnCompleted
+    call play_completion_sound ; Column completed sound
+
+skipCheckCompleted:
+    pop si
+    pop dx
+    pop cx
+    pop bx
+    pop ax
+    ret
 
 
 ; PRINTING GRID AND NUMBERS
@@ -1604,7 +1885,7 @@ printBorderRemain:
     ret
 
 printNumbers:
-    mov ax, row1
+    mov ax, [row1]
     mov [rowAddress], ax
     mov cx, 2        ; y pos
     printOuterLoop:
@@ -1636,7 +1917,7 @@ printNumbers:
         ret
 
 printNumbersRemain:
-    mov ax, row7
+    mov ax, [row7]
     mov [rowAddress], ax
     mov cx, 2        ; y pos
     printOuterLoopRemain:
@@ -1691,7 +1972,7 @@ startingscreen:
 
     fill_screen_upwards:                     
         mov bx, 80                  ; 80 columns to copy
-
+        
 copy_row:
     ; Copy the row from the last filled row
     mov ax, [es:si]             
@@ -1699,18 +1980,15 @@ copy_row:
     add si, 2                   
     add di, 2                  
     dec bx                      ; Decrement column count
-    jnz copy_row  
+    jnz copy_row
 	
     ; Move up to the previous row
     sub si, 160                 ; Move SI to the previous row 
-    sub di, 160    
+    sub di, 160
    
    
    call delay
    call play_tone_sequence
-    ;    call play_correct_input_sound
-    ;    call play_incorrect_input_sound
-    ;    call play_on_rowncol_completion
    sub di,160
    cmp di,0
    je endofrows
@@ -1719,7 +1997,7 @@ copy_row:
    ret
    
     endofrows:
-    ret
+        ret
 
 play_tone_sequence:
     mov cx,1
@@ -1804,7 +2082,7 @@ display_continue_msg:
     mov es, ax
     mov si, continue_msg        ; Point SI to the continue message
     mov cx, 27                  ; Length of mssg
-    mov di, (12 * 80 + 28 - 2) * 2  
+    mov di, (12 * 80 + 22 - 2) * 2  
 
 print_continue_char:
     lodsb                       ; Load next character into AL
@@ -2024,7 +2302,7 @@ countNumbersInGrid:
         ret
 
 wrapper_count_numbers_in_grid:
-    mov dx,row1
+    mov dx,[row1]
     call countNumbersInGrid
     ret
 
@@ -2120,53 +2398,53 @@ undoMove:
     undoOnMainGrid:
         mov ax,[prevCursorRow]
         cmp ax,0
-        je setRow1ForUndo
+        je setrow1ForUndo
         cmp ax,1
-        je setRow2ForUndo
+        je setrow2ForUndo
         cmp ax,2
-        je setRow3ForUndo
+        je setrow3ForUndo
         cmp ax,3
-        je setRow4ForUndo
+        je setrow4ForUndo
         cmp ax,4
-        je setRow5ForUndo
+        je setrow5ForUndo
         cmp ax,5
-        je setRow6ForUndo
+        je setrow6ForUndo
     undoOnRemainGrid:
         mov ax,[prevCursorRowRemain]
         cmp ax,0
-        je setRow7ForUndo
+        je setrow7ForUndo
         cmp ax,1
-        je setRow8ForUndo
+        je setrow8ForUndo
         cmp ax,2
-        je setRow9ForUndo
+        je setrow9ForUndo
     jmp endUndo
 
-    setRow1ForUndo:
-        mov si,row1
+    setrow1ForUndo:
+        mov si,[row1]
         jmp doFurtherForPage0
-    setRow2ForUndo:
-        mov si,row2
+    setrow2ForUndo:
+        mov si,[row2]
         jmp doFurtherForPage0
-    setRow3ForUndo:
-        mov si,row3
+    setrow3ForUndo:
+        mov si,[row3]
         jmp doFurtherForPage0
-    setRow4ForUndo:
-        mov si,row4
+    setrow4ForUndo:
+        mov si,[row4]
         jmp doFurtherForPage0
-    setRow5ForUndo:
-        mov si,row5
+    setrow5ForUndo:
+        mov si,[row5]
         jmp doFurtherForPage0
-    setRow6ForUndo:
-        mov si,row6
+    setrow6ForUndo:
+        mov si,[row6]
         jmp doFurtherForPage0
-    setRow7ForUndo:
-        mov si,row7
+    setrow7ForUndo:
+        mov si,[row7]
         jmp doFurtherForPage2
-    setRow8ForUndo:
-        mov si,row8
+    setrow8ForUndo:
+        mov si,[row8]
         jmp doFurtherForPage2
-    setRow9ForUndo:
-        mov si,row9
+    setrow9ForUndo:
+        mov si,[row9]
         jmp doFurtherForPage2
 
     doFurtherForPage0:
@@ -2246,26 +2524,26 @@ askForInput:
     ; SAVING si FOR MAIN GRID
     saveSIPage0:
         cmp byte [cursorRow],0
-        je saveRow1
+        je saverow1
         cmp byte [cursorRow],1
-        je saveRow2
+        je saverow2
         cmp byte [cursorRow],2
-        je saveRow3
+        je saverow3
         cmp byte [cursorRow],3
-        je saveRow4
+        je saverow4
         cmp byte [cursorRow],4
-        je saveRow5
+        je saverow5
         cmp byte [cursorRow],5
-        je saveRow6
+        je saverow6
 
     ; SAVING si FOR REMAINING GRID
     saveSIPage2:
         cmp byte [cursorRowRemain],0
-        je saveRow7
+        je saverow7
         cmp byte [cursorRowRemain],1
-        je saveRow8
+        je saverow8
         cmp byte [cursorRowRemain],2
-        je saveRow9
+        je saverow9
 
     tempNext:
     cmp byte [currentPage], 0
@@ -2425,6 +2703,7 @@ askForInput:
             call saveCurrentState
             shl bx,1
             mov word [si + bx], '1'
+            call checkCompletedLines
             ret
     
 
@@ -2450,6 +2729,7 @@ askForInput:
             call saveCurrentState
             shl bx,1
             mov word [si + bx], '2'
+            call checkCompletedLines
             ret
 
     toInput3:
@@ -2471,6 +2751,7 @@ askForInput:
             call saveCurrentState
             shl bx,1
             mov word [si + bx], '3'
+            call checkCompletedLines
             ret
 
     toInput4:
@@ -2498,6 +2779,7 @@ askForInput:
             call saveCurrentState
             shl bx,1
             mov word [si + bx], '4'
+            call checkCompletedLines
             ret
 
     toInput5:
@@ -2519,6 +2801,7 @@ askForInput:
             call saveCurrentState
             shl bx,1
             mov word [si + bx], '5'
+            call checkCompletedLines
             ret
 
     toInput6:
@@ -2540,6 +2823,7 @@ askForInput:
             call saveCurrentState
             shl bx,1
             mov word [si + bx], '6'
+            call checkCompletedLines
             ret
 
     toInput7:
@@ -2561,6 +2845,7 @@ askForInput:
             call saveCurrentState
             shl bx,1
             mov word [si + bx], '7'
+            call checkCompletedLines
             ret
 
     toInput8:
@@ -2582,6 +2867,7 @@ askForInput:
             call saveCurrentState
             shl bx,1
             mov word [si + bx], '8'
+            call checkCompletedLines
             ret
 
     toInput9:
@@ -2603,6 +2889,7 @@ askForInput:
             call saveCurrentState
             shl bx,1
             mov word [si + bx], '9'
+            call checkCompletedLines
             ret
         
         
@@ -2630,6 +2917,7 @@ askForInput:
             call saveCurrentState
             shl bx,1
             mov word [si + bx], '1'
+            call checkCompletedLines
             ret
 
     toInput2Remain:
@@ -2650,6 +2938,7 @@ askForInput:
             call saveCurrentState
             shl bx,1
             mov word [si + bx], '2'
+            call checkCompletedLines
             ret
 
     toInput3Remain:
@@ -2670,6 +2959,7 @@ askForInput:
             call saveCurrentState
             shl bx,1
             mov word [si + bx], '3'
+            call checkCompletedLines
             ret
 
     toInput4Remain:
@@ -2690,6 +2980,7 @@ askForInput:
             call saveCurrentState
             shl bx,1
             mov word [si + bx], '4'
+            call checkCompletedLines
             ret
 
     toInput5Remain:
@@ -2710,6 +3001,7 @@ askForInput:
             call saveCurrentState
             shl bx,1
             mov word [si + bx], '5'
+            call checkCompletedLines
             ret
 
     toInput6Remain:
@@ -2730,6 +3022,7 @@ askForInput:
             call saveCurrentState
             shl bx,1
             mov word [si + bx], '6'
+            call checkCompletedLines
             ret
 
     toInput7Remain:
@@ -2750,6 +3043,7 @@ askForInput:
             call saveCurrentState
             shl bx,1
             mov word [si + bx], '7'
+            call checkCompletedLines
             ret
 
     toInput8Remain:
@@ -2770,6 +3064,7 @@ askForInput:
             call saveCurrentState
             shl bx,1
             mov word [si + bx], '8'
+            call checkCompletedLines
             ret
 
     toInput9Remain:
@@ -2790,46 +3085,47 @@ askForInput:
             call saveCurrentState
             shl bx,1
             mov word [si + bx], '9'
+            call checkCompletedLines
             ret
 
     short_ret:
         ret
         
 
-    saveRow1:
-        mov si,row1
+    saverow1:
+        mov si,[row1]
         jmp tempNext
     
-    saveRow2:
-        mov si,row2
+    saverow2:
+        mov si,[row2]
         jmp tempNext
     
-    saveRow3:
-        mov si,row3
+    saverow3:
+        mov si,[row3]
         jmp tempNext
     
-    saveRow4:
-        mov si,row4
+    saverow4:
+        mov si,[row4]
         jmp tempNext
 
-    saveRow5:
-        mov si,row5
+    saverow5:
+        mov si,[row5]
         jmp tempNext
     
-    saveRow6:
-        mov si,row6
+    saverow6:
+        mov si,[row6]
         jmp tempNext
 
-    saveRow7:
-        mov si,row7
+    saverow7:
+        mov si,[row7]
         jmp tempNext
 
-    saveRow8:
-        mov si,row8
+    saverow8:
+        mov si,[row8]
         jmp tempNext
 
-    saveRow9:
-        mov si,row9
+    saverow9:
+        mov si,[row9]
         jmp tempNext
         
 
@@ -3382,19 +3678,98 @@ waitForKey:
     int 0x16
     ret
 
+setDifficulty:
+    xor ax,ax
+    int 0x16
+
+    cmp ah,0x30
+    je setEasy
+    cmp ah,0x31
+    je setMedium
+    cmp ah,0x32
+    je setHard
+
+    setEasy:
+        mov ax,erow1
+        mov [row1],ax
+        mov ax,erow2
+        mov [row2],ax
+        mov ax,erow3
+        mov [row3],ax
+        mov ax,erow4
+        mov [row4],ax
+        mov ax,erow5
+        mov [row5],ax
+        mov ax,erow6
+        mov [row6],ax
+        mov ax,erow7
+        mov [row7],ax
+        mov ax,erow8
+        mov [row8],ax
+        mov ax,erow9
+        mov [row9],ax
+        jmp returnFromSetDiff
+
+    setMedium:
+        mov ax,mrow1
+        mov [row1],ax
+        mov ax,mrow2
+        mov [row2],ax
+        mov ax,mrow3
+        mov [row3],ax
+        mov ax,mrow4
+        mov [row4],ax
+        mov ax,mrow5
+        mov [row5],ax
+        mov ax,mrow6
+        mov [row6],ax
+        mov ax,mrow7
+        mov [row7],ax
+        mov ax,mrow8
+        mov [row8],ax
+        mov ax,mrow9
+        mov [row9],ax
+        jmp returnFromSetDiff
+
+    setHard:
+        mov ax,hrow1
+        mov [row1],ax
+        mov ax,hrow2
+        mov [row2],ax
+        mov ax,hrow3
+        mov [row3],ax
+        mov ax,hrow4
+        mov [row4],ax
+        mov ax,hrow5
+        mov [row5],ax
+        mov ax,hrow6
+        mov [row6],ax
+        mov ax,hrow7
+        mov [row7],ax
+        mov ax,hrow8
+        mov [row8],ax
+        mov ax,hrow9
+        mov [row9],ax
+        jmp returnFromSetDiff
+
+
+    returnFromSetDiff:
+        ret
+
 
 
 ; MAIN GAME FUNCTION
 gameSubroutine:
     ; WELCOME SCREEN
     WELCOME:
-        ; call clrscr             
-        ; call startingscreen    
-        ; call clrscrwithdelay
-        ; call turnoffspeakers
-        ; call display_message_effect  
-        ; call display_continue_msg 
-        ; call waitForKey
+        call clrscr             
+        call startingscreen    
+        call clrscrwithdelay
+        call turnoffspeakers
+        call display_message_effect  
+        call display_continue_msg 
+        call setDifficulty
+        
 
     ; GAME CONFIGURATIONS
     SETTINGS:
